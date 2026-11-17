@@ -576,9 +576,14 @@
               ${a.idViaje ? `<span class="pill pill-blue">Viaje ${a.idViaje}</span>` : `<span class="pill pill-red">MANUAL</span>`}
               <span class="pill">${a.pallets} pallets</span>
               ${a.tipoVehiculo ? `<span class="pill">${a.tipoVehiculo}</span>` : ''}
-              ${a.anden ? `<span class="pill">${a.anden}</span>` : ''}
               <span class="pill">Inicio: ${a.horaInicioTexto}</span>
             </div>
+            ${a.observacion ? `<div style="margin-top:8px; padding:6px 8px; background:#f1f5f9; border-radius:8px; font-size:12px; color:#1e293b;">💬 ${a.observacion}</div>` : ''}
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="text" id="obs-live-${a.idRegistro}" placeholder="Agregar comentario en curso..." style="padding:8px 10px; font-size:13px;"
+                   onkeydown="if(event.key==='Enter') agregarComentarioApp('${a.idRegistro}')" />
+            <button class="btn btn-outline btn-sm" id="btn-obs-${a.idRegistro}" onclick="agregarComentarioApp('${a.idRegistro}')" title="Agregar comentario">💬</button>
           </div>
           <button class="btn btn-stop" onclick="finalizarDescargaApp('${a.idRegistro}', '${a.patente}')">⏹ FINALIZAR DESCARGA</button>
         </div>
@@ -764,6 +769,23 @@
       document.getElementById('box-form-descarga').classList.add('hidden');
       selectedTrip = null;
       modoManualActivo = false;
+    }
+
+    async function agregarComentarioApp(idRegistro) {
+      const inp = document.getElementById('obs-live-' + idRegistro);
+      const txt = inp ? inp.value.trim() : '';
+      if (!txt) { toast('Escribe un comentario primero.'); return; }
+      const btn = document.getElementById('btn-obs-' + idRegistro);
+      if (btn) btn.disabled = true;
+      try {
+        const res = await apiCall('agregarComentarioActivo', idRegistro, txt, currentUser.correo);
+        activosList = res.activos || [];
+        renderActivos();
+        toast('💬 Comentario agregado.');
+      } catch (err) {
+        if (btn) btn.disabled = false;
+        toast('Error: ' + err.message);
+      }
     }
 
     async function finalizarDescargaApp(idRegistro, patente) {
