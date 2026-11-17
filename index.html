@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#1d4ed8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Descarga PN8000" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <title>App Operario Descarga - PN8000</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #020617;
+      --muted: #334155;
+      --border: #cbd5e1;
+      --primary: #1d4ed8;
+      --green: #15803d;
+      --red: #dc2626;
+      --amber: #d97706;
+      --amber-bg: #fef3c7;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); -webkit-tap-highlight-color: transparent; }
+    .hidden { display: none !important; }
+
+    .topbar {
+      background: #ffffff; color: #020617; padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50; border-bottom: 2px solid #cbd5e1;
+      box-shadow: 0 2px 6px rgba(15,23,42,0.06);
+    }
+    .topbar-title { font-weight: 800; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .badge-planta { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+    .user-pill { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+    .btn-logout { background: #f1f5f9; color: #0f172a; border: 1.5px solid #94a3b8; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; }
+
+    .nav-tabs {
+      display: flex; gap: 6px; padding: 10px 12px; background: #fff; border-bottom: 1px solid var(--border);
+      overflow-x: auto; position: sticky; top: 52px; z-index: 40;
+    }
+    .nav-tab {
+      border: 1px solid var(--border); background: #f8fafc; color: var(--muted);
+      padding: 9px 14px; border-radius: 10px; font-weight: 700; font-size: 13px;
+      cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px;
+    }
+    .nav-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 14px; }
+    .card {
+      background: var(--card); border-radius: var(--radius); padding: 16px;
+      border: 1.5px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.04); margin-bottom: 14px;
+    }
+    .card-title { font-size: 16px; font-weight: 800; margin: 0 0 12px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+    label { display: block; font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+    input, select {
+      width: 100%; padding: 11px 12px; border: 2px solid #94a3b8; border-radius: 10px;
+      font-size: 16px; font-weight: 600; background: #ffffff; color: #020617; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--primary); }
+    .input-patente { font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; text-align: center; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    @media (max-width: 680px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+    button, .btn, .nav-tab, .trip-option { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+    .btn {
+      border: none; border-radius: 12px; padding: 13px 16px; min-height: 48px; font-weight: 700; font-size: 16px;
+      cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      transition: transform 0.05s ease, opacity 0.15s ease;
+    }
+    .btn:active { transform: scale(0.97); opacity: 0.9; }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-start { background: var(--green); color: #fff; width: 100%; min-height: 58px; padding: 16px; font-size: 19px; box-shadow: 0 4px 12px rgba(21,128,61,0.28); }
+    .btn-stop { background: var(--red); color: #fff; width: 100%; min-height: 54px; padding: 15px; font-size: 17px; box-shadow: 0 4px 10px rgba(220,38,38,0.25); }
+    .btn-outline { background: #fff; color: var(--text); border: 2px solid #94a3b8; }
+    .btn-amber { background: var(--amber); color: #fff; }
+    .btn-sm { padding: 8px 12px; min-height: 38px; font-size: 13px; border-radius: 8px; }
+
+    .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: linear-gradient(135deg, #e0f2fe, #f8fafc); }
+    .login-box { background: #ffffff; width: 100%; max-width: 400px; border-radius: 18px; padding: 26px; border: 2px solid #cbd5e1; box-shadow: 0 12px 28px rgba(15,23,42,0.12); }
+
+    .trip-option { border: 2px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 8px; cursor: pointer; }
+    .trip-option.selected { border-color: var(--primary); background: #eff6ff; }
+    .trip-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: 12px; }
+    .pill { background: #e2e8f0; color: #334155; padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; }
+    .pill-blue { background: #dbeafe; color: #1e40af; }
+    .pill-amber { background: #fef3c7; color: #92400e; }
+    .pill-red { background: #fee2e2; color: #991b1b; }
+    .pill-green { background: #dcfce7; color: #166534; }
+
+    .active-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+    .truck-card { border: 2px solid #94a3b8; border-radius: 14px; padding: 14px; background: #fff; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; }
+    .truck-card.over-meta { border-color: var(--red); background: #fef2f2; }
+    .timer-display { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--primary); }
+    .truck-card.over-meta .timer-display { color: var(--red); }
+
+    .alert-box { background: var(--amber-bg); border: 1.5px solid #f59e0b; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; color: #78350f; }
+    .alert-danger { background: #fef2f2; border-color: #ef4444; color: #7f1d1d; }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th { background: #f8fafc; font-weight: 700; color: var(--muted); font-size: 11px; text-transform: uppercase; }
+
+    #toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #0f172a; color: #fff; padding: 12px 18px; border-radius: 12px;
+      font-weight: 600; font-size: 14px; z-index: 999; box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      display: none; max-width: 90%; text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN -->
+  <div id="view-login" class="login-wrap">
+    <div class="login-box">
+      <div style="text-align:center; margin-bottom:18px;">
+        <div style="font-size:34px;">🚛⏱️</div>
+        <h2 style="margin:6px 0 4px;">App Operario Descarga</h2>
+        <span class="badge-planta">PLANTA PN8000</span>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label>Correo o Usuario</label>
+        <input type="text" id="login-id" placeholder="ej: operador@pn8000.cl o usuario" autocomplete="username" />
+      </div>
+      <div style="margin-bottom:14px;">
+        <label>Clave / PIN</label>
+        <input type="password" id="login-pass" placeholder="••••" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()" />
+      </div>
+      <div style="margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="login-remember" style="width:18px; height:18px; cursor:pointer;" />
+        <label for="login-remember" style="margin:0; text-transform:none; font-size:14px; font-weight:600; cursor:pointer;">Mantener sesión iniciada en este dispositivo</label>
+      </div>
+      <button class="btn btn-primary" style="width:100%;" id="btn-login" onclick="doLogin()">Ingresar</button>
+      <button class="btn btn-outline hidden" style="width:100%; margin-top:10px;" id="btn-install-pwa" onclick="instalarPWA()">📲 Instalar App en este dispositivo</button>
+      <div id="login-error" style="color:var(--red); font-size:13px; font-weight:600; margin-top:10px; text-align:center;"></div>
+    </div>
+  </div>
+
+  <!-- APP PRINCIPAL -->
+  <div id="view-app" class="hidden">
+    <header class="topbar">
+      <div class="topbar-title">
+        <span>🚛 Descargas</span>
+        <span class="badge-planta" id="lbl-planta">PN8000</span>
+      </div>
+      <div class="user-pill">
+        <button id="btn-update-pill" class="btn btn-amber btn-sm hidden" onclick="window.location.reload()">🔔 Actualizar</button>
+        <span id="lbl-user-info"></span>
+        <button class="btn-logout" onclick="doLogout()">Salir</button>
+      </div>
+    </header>
+
+    <nav class="nav-tabs" id="nav-tabs">
+      <button class="nav-tab active" data-tab="tiempos" onclick="switchTab('tiempos')">⏱️ Toma de Tiempos</button>
+      <button class="nav-tab hidden" data-tab="moderador" id="tab-btn-moderador" onclick="switchTab('moderador')">🛡️ Moderador</button>
+    </nav>
+
+    <main class="container">
+      <!-- TOMA DE TIEMPOS -->
+      <section id="tab-tiempos">
+        <div class="card">
+          <div class="card-title">
+            <span>🚚 Camiones en Descarga (<span id="count-activos">0</span>)</span>
+            <button class="btn btn-outline btn-sm" onclick="refrescarEstado()">🔄 Actualizar</button>
+          </div>
+          <div id="lista-activos" class="active-grid">
+            <div style="color:var(--muted); font-size:14px;">No hay camiones descargando en este momento.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>➕ Registrar Nueva Descarga</span>
+            <span style="font-size:12px; color:var(--muted);" id="lbl-maestra-info"></span>
+          </div>
+
+          <div class="grid-2" style="align-items:end; margin-bottom:12px;">
+            <div>
+              <label>1. Patente del Camión (Principal o Rampla)</label>
+              <input type="text" id="inp-patente" class="input-patente" placeholder="EJ: JJJJ24" onkeydown="if(event.key==='Enter') buscarPorPatente()" />
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-primary" id="btn-buscar-patente" style="flex:1;" onclick="buscarPorPatente()">🔍 Buscar en Excel</button>
+              <button class="btn btn-outline" onclick="activarModoManual()">✍️ Manual</button>
+              <button class="btn btn-outline" onclick="actualizarYLimpiarBusqueda()">🔄 Actualizar</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px; font-size:13px;">
+            <input type="checkbox" id="chk-todos-dep" style="width:auto;" />
+            <label for="chk-todos-dep" style="margin:0; text-transform:none; font-weight:500;">Incluir viajes donde PN8000 no es Depósito Origen</label>
+          </div>
+
+          <div id="box-resultados-viajes" class="hidden" style="margin-bottom:14px;">
+            <label id="lbl-resultados-titulo">Selecciona el viaje correspondiente:</label>
+            <div id="lista-viajes-encontrados"></div>
+          </div>
+
+          <div id="box-alerta-manual" class="alert-box alert-danger hidden">
+            <strong>⚠️ Patente no encontrada en el Excel:</strong> Estás en modo <strong>Digitación Manual</strong>. Este registro generará una alerta en el Dashboard principal.
+          </div>
+
+          <div id="box-form-descarga" class="hidden">
+            <input type="hidden" id="inp-id-viaje" />
+            <input type="hidden" id="inp-pallets" />
+            <input type="hidden" id="inp-categoria" />
+            <input type="hidden" id="inp-origen" />
+            <input type="hidden" id="inp-patente-sec" />
+            <input type="hidden" id="inp-tipo-veh" />
+
+            <div class="grid-2" style="margin-bottom:14px;">
+              <div>
+                <label>2. Empresa de Transporte (EETT) *</label>
+                <select id="sel-eett" onchange="onChangeEettSelect()">
+                  <option value="">-- Seleccionar EETT --</option>
+                </select>
+              </div>
+              <div id="wrap-eett-manual" class="hidden">
+                <label>Digitar Nueva EETT *</label>
+                <input type="text" id="inp-eett-manual" placeholder="Nombre empresa de transporte" />
+              </div>
+              <div>
+                <label>3. Observación (Opcional)</label>
+                <input type="text" id="inp-obs" placeholder="Comentarios adicionales (opcional)" />
+              </div>
+            </div>
+
+            <button class="btn btn-start" id="btn-iniciar" onclick="iniciarDescargaApp()">
+              ▶ INICIAR DESCARGA
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODERADOR -->
+      <section id="tab-moderador" class="hidden">
+        <div class="card">
+          <div class="card-title">
+            <span>⚙️ Configuración Operativa</span>
+            <a id="link-sheet-base" href="#" target="_blank" class="btn btn-outline btn-sm hidden" style="text-decoration:none;">📄 Abrir Google Sheet</a>
+          </div>
+          <div class="grid-3">
+            <div><label>Planta Objetivo</label><input type="text" id="cfg-planta" value="PN8000" /></div>
+            <div><label>Meta Descarga (Minutos)</label><input type="number" id="cfg-meta" value="45" min="1" /></div>
+            <div>
+              <label>Filtro Depósito Excel</label>
+              <select id="cfg-filtro">
+                <option value="ORIGEN">Solo Depósito Origen (PN8000)</option>
+                <option value="DESTINO">Solo Depósito Destino</option>
+                <option value="AMBOS">Origen o Destino</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="guardarConfigApp()">Guardar Configuración</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">👥 Crear / Editar Usuario</div>
+          <div class="grid-3" style="margin-bottom:10px;">
+            <div><label>Correo *</label><input type="email" id="u-correo" placeholder="operador@empresa.cl" /></div>
+            <div><label>Usuario *</label><input type="text" id="u-usuario" placeholder="jperez" /></div>
+            <div><label>Nombre Completo</label><input type="text" id="u-nombre" placeholder="Juan Pérez" /></div>
+          </div>
+          <div class="grid-3" style="margin-bottom:10px;">
+            <div><label>Clave / PIN *</label><input type="text" id="u-clave" placeholder="1234" /></div>
+            <div>
+              <label>Rol</label>
+              <select id="u-rol">
+                <option value="OPERADOR">OPERADOR</option>
+                <option value="VISOR">VISOR</option>
+                <option value="MODERADOR">MODERADOR</option>
+              </select>
+            </div>
+            <div>
+              <label>Estado</label>
+              <select id="u-activo">
+                <option value="true">Activo</option>
+                <option value="false">Inactivo</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label>Funciones Asignadas</label>
+            <div style="display:flex; gap:14px; flex-wrap:wrap; padding-top:4px;">
+              <label style="display:flex; align-items:center; gap:5px; text-transform:none; color:var(--text);"><input type="checkbox" class="u-func" value="TIEMPOS" checked style="width:auto;" /> Toma de Tiempos</label>
+              <label style="display:flex; align-items:center; gap:5px; text-transform:none; color:var(--text);"><input type="checkbox" class="u-func" value="DASHBOARD" style="width:auto;" /> Ver Dashboard</label>
+              <label style="display:flex; align-items:center; gap:5px; text-transform:none; color:var(--text);"><input type="checkbox" class="u-func" value="EXCEL" style="width:auto;" /> Cargar Excel</label>
+              <label style="display:flex; align-items:center; gap:5px; text-transform:none; color:var(--text);"><input type="checkbox" class="u-func" value="MODERADOR" style="width:auto;" /> Moderador</label>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="guardarUsuarioApp()">💾 Guardar Usuario</button>
+          <button class="btn btn-outline btn-sm" onclick="limpiarFormUsuario()">Limpiar</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📋 Usuarios Registrados</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Correo</th><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Funciones</th><th>Estado</th><th>Acción</th></tr></thead>
+              <tbody id="tbody-usuarios"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL ACTUALIZACIÓN -->
+  <div id="modal-actualizacion" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:300; display:flex; align-items:center; justify-content:center; padding:16px;">
+    <div class="card" style="width:100%; max-width:420px; margin:0; text-align:center; border:2px solid var(--primary);">
+      <div style="font-size:34px; margin-bottom:6px;">🚀</div>
+      <h3 style="margin:0 0 6px;">Nueva actualización disponible</h3>
+      <p style="margin:0 0 12px; color:var(--muted); font-size:14px;">
+        Versión <strong id="upd-version-lbl"></strong> lista. La app se actualizará en <strong id="upd-countdown" style="font-size:18px; color:var(--primary);">5</strong> segundos.
+      </p>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button class="btn btn-primary" onclick="window.location.reload()">🔄 Actualizar ahora</button>
+        <button class="btn btn-outline" onclick="postergarActualizacion()">⏸ Postergar (estoy midiendo un camión)</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
+    const CLIENT_APP_VERSION = '2.4';
+    const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
+
+    let currentUser = null;
+    let appConfig = { PLANTA_OBJETIVO: 'PN8000', META_MINUTOS: 45, FILTRO_DEPOSITO: 'ORIGEN' };
+    let eettList = [];
+    let viajesLocales = [];
+    let activosList = [];
+    let timerInterval = null;
+    let versionCheckInterval = null;
+    let updateCountdownTimer = null;
+    let versionPostergada = null;
+    let selectedTrip = null;
+    let modoManualActivo = false;
+    let deferredPrompt = null;
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('btn-install-pwa').classList.remove('hidden');
+    });
+
+    function instalarPWA() {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => {
+        deferredPrompt = null;
+        document.getElementById('btn-install-pwa').classList.add('hidden');
+      });
+    }
+
+    async function apiCall(action, ...args) {
+      const res = await fetch(GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: action, args: args })
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'Error en el servidor.');
+      return json.data;
+    }
+
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 3200);
+    }
+
+    async function doLogin() {
+      const id = document.getElementById('login-id').value.trim();
+      const pass = document.getElementById('login-pass').value.trim();
+      const remember = document.getElementById('login-remember').checked;
+      const errEl = document.getElementById('login-error');
+      errEl.textContent = '';
+      if (!id || !pass) { errEl.textContent = 'Completa correo/usuario y clave.'; return; }
+
+      const btn = document.getElementById('btn-login');
+      btn.disabled = true;
+      btn.textContent = 'Ingresando...';
+      try {
+        const user = await apiCall('loginUsuario', id, pass);
+        btn.disabled = false;
+        btn.textContent = 'Ingresar';
+        if (remember) localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify({ id: id, pass: pass }));
+        else localStorage.removeItem(STORAGE_SESSION_KEY);
+        currentUser = user;
+        iniciarSesionUI();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Ingresar';
+        localStorage.removeItem(STORAGE_SESSION_KEY);
+        errEl.textContent = err.message;
+      }
+    }
+
+    function doLogout() {
+      currentUser = null;
+      localStorage.removeItem(STORAGE_SESSION_KEY);
+      if (timerInterval) clearInterval(timerInterval);
+      if (versionCheckInterval) clearInterval(versionCheckInterval);
+      document.getElementById('view-app').classList.add('hidden');
+      document.getElementById('view-login').classList.remove('hidden');
+      document.getElementById('login-pass').value = '';
+      document.getElementById('login-remember').checked = false;
+    }
+
+    function iniciarSesionUI() {
+      const funcs = currentUser.funciones || [];
+      const isMod = currentUser.rol === 'MODERADOR' || funcs.includes('MODERADOR');
+      document.getElementById('view-login').classList.add('hidden');
+      document.getElementById('view-app').classList.remove('hidden');
+      document.getElementById('lbl-user-info').textContent = currentUser.usuario + ' (' + currentUser.rol + ')';
+      document.getElementById('tab-btn-moderador').classList.toggle('hidden', !isMod);
+      switchTab('tiempos');
+      refrescarEstado();
+
+      if (versionCheckInterval) clearInterval(versionCheckInterval);
+      versionCheckInterval = setInterval(async () => {
+        try {
+          const v = await apiCall('getAppVersion');
+          verificarVersion(v);
+        } catch (e) {}
+      }, 60000);
+    }
+
+    function verificarVersion(serverVersion) {
+      if (!serverVersion || serverVersion === CLIENT_APP_VERSION) return;
+      if (versionPostergada === serverVersion) return;
+      const modal = document.getElementById('modal-actualizacion');
+      if (!modal.classList.contains('hidden')) return;
+
+      document.getElementById('upd-version-lbl').textContent = 'v' + serverVersion;
+      let seg = 5;
+      document.getElementById('upd-countdown').textContent = seg;
+      modal.classList.remove('hidden');
+
+      if (updateCountdownTimer) clearInterval(updateCountdownTimer);
+      updateCountdownTimer = setInterval(() => {
+        seg--;
+        document.getElementById('upd-countdown').textContent = seg;
+        if (seg <= 0) {
+          clearInterval(updateCountdownTimer);
+          window.location.reload();
+        }
+      }, 1000);
+    }
+
+    function postergarActualizacion() {
+      if (updateCountdownTimer) clearInterval(updateCountdownTimer);
+      versionPostergada = document.getElementById('upd-version-lbl').textContent.replace('v', '') || true;
+      document.getElementById('modal-actualizacion').classList.add('hidden');
+      document.getElementById('btn-update-pill').classList.remove('hidden');
+      toast('⏸ Actualización postergada. Toca "🔔 Actualizar" arriba cuando termines.');
+    }
+
+    function switchTab(tab) {
+      ['tiempos', 'moderador'].forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+        const btn = document.querySelector(`[data-tab="${t}"]`);
+        if (btn) btn.classList.toggle('active', t === tab);
+      });
+      if (tab === 'moderador') cargarModerador();
+    }
+
+    async function refrescarEstado() {
+      try {
+        const res = await apiCall('getEstadoInicial', currentUser.correo);
+        verificarVersion(res.appVersion);
+        appConfig = res.config || appConfig;
+        eettList = res.eetts || [];
+        viajesLocales = res.viajesLocales || [];
+        activosList = res.activos || [];
+        document.getElementById('lbl-planta').textContent = appConfig.PLANTA_OBJETIVO;
+        document.getElementById('lbl-maestra-info').textContent =
+          res.totalViajesPlanta + ' viajes ' + appConfig.PLANTA_OBJETIVO +
+          (res.ultimaCarga ? ' (Carga: ' + res.ultimaCarga + ')' : '');
+        poblarSelectEett();
+        renderActivos();
+      } catch (err) {
+        toast('Error: ' + err.message);
+      }
+    }
+
+    function poblarSelectEett(valorSeleccionado) {
+      const sel = document.getElementById('sel-eett');
+      const prev = valorSeleccionado !== undefined ? valorSeleccionado : sel.value;
+      sel.innerHTML = '<option value="">-- Seleccionar EETT --</option>';
+      const list = [...eettList];
+      if (prev && !list.includes(prev) && prev !== '__OTRA__') list.unshift(prev);
+      list.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e; opt.textContent = e;
+        sel.appendChild(opt);
+      });
+      const optOtra = document.createElement('option');
+      optOtra.value = '__OTRA__';
+      optOtra.textContent = '➕ Otra (digitar manualmente)';
+      sel.appendChild(optOtra);
+      if (prev) sel.value = prev;
+      onChangeEettSelect();
+    }
+
+    function onChangeEettSelect() {
+      document.getElementById('wrap-eett-manual').classList.toggle('hidden', document.getElementById('sel-eett').value !== '__OTRA__');
+    }
+
+    function renderActivos() {
+      const wrap = document.getElementById('lista-activos');
+      document.getElementById('count-activos').textContent = activosList.length;
+      if (timerInterval) clearInterval(timerInterval);
+
+      if (activosList.length === 0) {
+        wrap.innerHTML = '<div style="color:var(--muted); font-size:14px;">No hay camiones descargando en este momento.</div>';
+        return;
+      }
+
+      const syncNow = Date.now();
+      wrap.innerHTML = activosList.map(a => `
+        <div class="truck-card" id="card-${a.idRegistro}">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:20px; font-weight:800;">${a.patente}</span>
+              <span class="timer-display" data-elapsed="${Number(a.elapsedMs) || 0}" data-sync="${syncNow}">00:00</span>
+            </div>
+            <div style="font-size:13px; font-weight:600; color:var(--primary); margin-top:2px;">${a.eett}</div>
+            <div class="trip-meta">
+              ${a.idViaje ? `<span class="pill pill-blue">Viaje ${a.idViaje}</span>` : `<span class="pill pill-red">MANUAL</span>`}
+              <span class="pill">${a.pallets} pallets</span>
+              ${a.tipoVehiculo ? `<span class="pill">${a.tipoVehiculo}</span>` : ''}
+              ${a.anden ? `<span class="pill">${a.anden}</span>` : ''}
+              <span class="pill">Inicio: ${a.horaInicioTexto}</span>
+            </div>
+          </div>
+          <button class="btn btn-stop" onclick="finalizarDescargaApp('${a.idRegistro}', '${a.patente}')">⏹ FINALIZAR DESCARGA</button>
+        </div>
+      `).join('');
+
+      actualizarCronometros();
+      timerInterval = setInterval(actualizarCronometros, 1000);
+    }
+
+    function actualizarCronometros() {
+      const metaMs = (Number(appConfig.META_MINUTOS) || 45) * 60000;
+      const ahora = Date.now();
+      document.querySelectorAll('.timer-display').forEach(el => {
+        const diff = Math.max(0, (Number(el.dataset.elapsed) || 0) + (ahora - (Number(el.dataset.sync) || ahora)));
+        const mins = Math.floor(diff / 60000);
+        const secs = Math.floor((diff % 60000) / 1000);
+        el.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+        const card = el.closest('.truck-card');
+        if (card) card.classList.toggle('over-meta', diff > metaMs);
+      });
+    }
+
+    function actualizarYLimpiarBusqueda() {
+      limpiarFormularioToma();
+      refrescarEstado();
+      toast('🔄 Datos actualizados y búsqueda limpia.');
+    }
+
+    function mostrarResultadosBusqueda(viajes, pat) {
+      if (!viajes || viajes.length === 0) {
+        activarModoManual();
+        return;
+      }
+      modoManualActivo = false;
+      document.getElementById('box-alerta-manual').classList.add('hidden');
+      document.getElementById('box-resultados-viajes').classList.remove('hidden');
+      document.getElementById('lbl-resultados-titulo').textContent =
+        viajes.length > 1
+          ? `Se encontraron ${viajes.length} viajes para ${pat}. Elige cuál estás descargando:`
+          : `Viaje encontrado para ${pat}:`;
+
+      document.getElementById('lista-viajes-encontrados').innerHTML = viajes.map((v, idx) => `
+        <div class="trip-option ${idx === 0 ? 'selected' : ''}" onclick="seleccionarViaje(${idx})" id="trip-opt-${idx}">
+          <div style="display:flex; justify-content:space-between; font-weight:700;">
+            <span>ID Viaje: ${v.idViaje} — ${v.eett}</span>
+            <span class="pill ${v.esPlantaObjetivo !== false ? 'pill-green' : 'pill-amber'}">${v.depositoOrigen} → ${v.depositoDestino}</span>
+          </div>
+          <div class="trip-meta">
+            <span class="pill pill-blue">${v.palletsDespachados || v.palletsPlanificados} pallets</span>
+            <span class="pill">${v.tipoVehiculo}</span>
+            <span class="pill">${v.categoria}</span>
+            <span class="pill">Jornada: ${v.jornada}</span>
+          </div>
+        </div>
+      `).join('');
+
+      window._viajesEncontrados = viajes;
+      seleccionarViaje(0);
+    }
+
+    async function buscarPorPatente() {
+      const pat = document.getElementById('inp-patente').value.trim().toUpperCase();
+      if (pat.length < 4) { toast('Ingresa al menos 4 caracteres de la patente.'); return; }
+      const pNorm = pat.replace(/[^A-Z0-9]/g, '');
+      const incluirOtros = document.getElementById('chk-todos-dep').checked;
+
+      selectedTrip = null;
+      window._viajesEncontrados = [];
+      modoManualActivo = false;
+      document.getElementById('box-resultados-viajes').classList.add('hidden');
+      document.getElementById('lista-viajes-encontrados').innerHTML = '';
+      document.getElementById('box-alerta-manual').classList.add('hidden');
+      document.getElementById('box-form-descarga').classList.add('hidden');
+
+      if (!incluirOtros && viajesLocales.length > 0) {
+        const localMatches = viajesLocales.filter(v => {
+          const v1 = String(v.vehiculo || '').replace(/[^A-Z0-9]/g, '');
+          const v2 = String(v.vehiculoSecundario || '').replace(/[^A-Z0-9]/g, '');
+          const com = String(v.comentario || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+          return v1 === pNorm || v2 === pNorm || v1.includes(pNorm) || v2.includes(pNorm) || com.includes(pNorm);
+        });
+        mostrarResultadosBusqueda(localMatches, pat);
+        return;
+      }
+
+      const btn = document.getElementById('btn-buscar-patente');
+      btn.disabled = true;
+      btn.textContent = '⏳ Buscando...';
+      try {
+        const res = await apiCall('buscarPatente', pat, currentUser.correo, incluirOtros);
+        btn.disabled = false;
+        btn.textContent = '🔍 Buscar en Excel';
+        if (res.eetts && res.eetts.length) eettList = res.eetts;
+        mostrarResultadosBusqueda(res.viajes || [], pat);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '🔍 Buscar en Excel';
+        toast('Error al buscar: ' + err.message);
+      }
+    }
+
+    function seleccionarViaje(idx) {
+      const v = (window._viajesEncontrados || [])[idx];
+      if (!v) return;
+      selectedTrip = v;
+      document.querySelectorAll('.trip-option').forEach((el, i) => el.classList.toggle('selected', i === idx));
+      document.getElementById('box-form-descarga').classList.remove('hidden');
+
+      poblarSelectEett(v.eett);
+      document.getElementById('inp-id-viaje').value = v.idViaje;
+      document.getElementById('inp-pallets').value = v.palletsDespachados || v.palletsPlanificados || 0;
+      document.getElementById('inp-tipo-veh').value = v.tipoVehiculo || '';
+      document.getElementById('inp-categoria').value = v.categoria || '';
+      document.getElementById('inp-origen').value = v.depositoOrigen || '';
+      document.getElementById('inp-patente-sec').value = v.vehiculoSecundario || '';
+      document.getElementById('inp-obs').value = v.comentario || '';
+    }
+
+    function activarModoManual() {
+      modoManualActivo = true;
+      selectedTrip = null;
+      document.getElementById('box-resultados-viajes').classList.add('hidden');
+      document.getElementById('box-alerta-manual').classList.remove('hidden');
+      document.getElementById('box-form-descarga').classList.remove('hidden');
+      poblarSelectEett('');
+      ['inp-id-viaje','inp-pallets','inp-tipo-veh','inp-categoria','inp-origen','inp-patente-sec','inp-obs'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    async function iniciarDescargaApp() {
+      const patente = document.getElementById('inp-patente').value.trim().toUpperCase();
+      let eettFinal = document.getElementById('sel-eett').value;
+      if (eettFinal === '__OTRA__') eettFinal = document.getElementById('inp-eett-manual').value.trim();
+      if (!patente) { toast('Ingresa la patente.'); return; }
+      if (!eettFinal) { toast('Selecciona o digita la Empresa de Transporte.'); return; }
+
+      const v = selectedTrip || {};
+      const payload = {
+        usuarioCorreo: currentUser.correo,
+        patente: patente,
+        eettFinal: eettFinal,
+        eettOriginal: v.eett || '',
+        origenDato: modoManualActivo ? 'MANUAL' : 'EXCEL',
+        idViaje: document.getElementById('inp-id-viaje').value.trim(),
+        vehiculoPrincipal: v.vehiculo || patente,
+        vehiculoSecundario: document.getElementById('inp-patente-sec').value.trim().toUpperCase(),
+        palletsPlanificados: v.palletsPlanificados || Number(document.getElementById('inp-pallets').value) || 0,
+        palletsDespachados: Number(document.getElementById('inp-pallets').value) || 0,
+        tipoVehiculo: document.getElementById('inp-tipo-veh').value.trim(),
+        categoria: document.getElementById('inp-categoria').value.trim(),
+        depositoOrigen: document.getElementById('inp-origen').value.trim(),
+        depositoDestino: v.depositoDestino || appConfig.PLANTA_OBJETIVO,
+        codigoEETT: v.codigoEETT || '',
+        jornadaExcel: v.jornada || '',
+        estadoExcel: v.estado || '',
+        anden: '',
+        observacion: document.getElementById('inp-obs').value.trim()
+      };
+
+      const btn = document.getElementById('btn-iniciar');
+      btn.disabled = true;
+      btn.textContent = '⏳ Iniciando...';
+      try {
+        const res = await apiCall('iniciarDescarga', payload);
+        btn.disabled = false;
+        btn.textContent = '▶ INICIAR DESCARGA';
+        activosList = res.activos || [];
+        renderActivos();
+        limpiarFormularioToma();
+        toast('⏱️ Descarga iniciada para ' + patente);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '▶ INICIAR DESCARGA';
+        toast('Error: ' + err.message);
+      }
+    }
+
+    function limpiarFormularioToma() {
+      document.getElementById('inp-patente').value = '';
+      document.getElementById('inp-obs').value = '';
+      document.getElementById('inp-eett-manual').value = '';
+      document.getElementById('box-resultados-viajes').classList.add('hidden');
+      document.getElementById('box-alerta-manual').classList.add('hidden');
+      document.getElementById('box-form-descarga').classList.add('hidden');
+      selectedTrip = null;
+      modoManualActivo = false;
+    }
+
+    async function finalizarDescargaApp(idRegistro, patente) {
+      if (!confirm(`¿Confirmar término de descarga para ${patente}?`)) return;
+      try {
+        const res = await apiCall('finalizarDescarga', idRegistro, currentUser.correo, '');
+        activosList = res.activos || [];
+        renderActivos();
+        toast(`✅ ${patente} finalizada en ${res.duracionMin} min (Meta: ${res.cumpleMeta})`);
+      } catch (err) {
+        toast('Error: ' + err.message);
+      }
+    }
+
+    async function cargarModerador() {
+      try {
+        const res = await apiCall('getModeradorData', currentUser.correo);
+        document.getElementById('cfg-planta').value = res.config.PLANTA_OBJETIVO;
+        document.getElementById('cfg-meta').value = res.config.META_MINUTOS;
+        document.getElementById('cfg-filtro').value = res.config.FILTRO_DEPOSITO;
+        if (res.sheetUrl) {
+          const linkEl = document.getElementById('link-sheet-base');
+          linkEl.href = res.sheetUrl;
+          linkEl.classList.remove('hidden');
+        }
+        document.getElementById('tbody-usuarios').innerHTML = res.usuarios.map(u => `
+          <tr>
+            <td>${u.correo}</td><td><strong>${u.usuario}</strong></td><td>${u.nombre}</td>
+            <td><span class="pill pill-blue">${u.rol}</span></td><td>${u.funciones}</td>
+            <td><span class="pill ${u.activo ? 'pill-green' : 'pill-red'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+            <td><button class="btn btn-outline btn-sm" onclick='editarUsuario(${JSON.stringify(u)})'>✏️</button></td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        toast('Error Moderador: ' + err.message);
+      }
+    }
+
+    function editarUsuario(u) {
+      document.getElementById('u-correo').value = u.correo;
+      document.getElementById('u-usuario').value = u.usuario;
+      document.getElementById('u-nombre').value = u.nombre;
+      document.getElementById('u-clave').value = u.clave;
+      document.getElementById('u-rol').value = u.rol;
+      document.getElementById('u-activo').value = String(u.activo);
+      const funcs = String(u.funciones || '').split(',').map(s => s.trim());
+      document.querySelectorAll('.u-func').forEach(cb => cb.checked = funcs.includes(cb.value));
+    }
+
+    function limpiarFormUsuario() {
+      ['u-correo','u-usuario','u-nombre','u-clave'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('u-rol').value = 'OPERADOR';
+      document.getElementById('u-activo').value = 'true';
+      document.querySelectorAll('.u-func').forEach(cb => cb.checked = cb.value === 'TIEMPOS');
+    }
+
+    async function guardarUsuarioApp() {
+      const funcs = Array.from(document.querySelectorAll('.u-func:checked')).map(cb => cb.value);
+      try {
+        const res = await apiCall('guardarUsuario', {
+          correo: document.getElementById('u-correo').value.trim(),
+          usuario: document.getElementById('u-usuario').value.trim(),
+          nombre: document.getElementById('u-nombre').value.trim(),
+          clave: document.getElementById('u-clave').value.trim(),
+          rol: document.getElementById('u-rol').value,
+          activo: document.getElementById('u-activo').value === 'true',
+          funciones: funcs
+        }, currentUser.correo);
+        toast('Usuario ' + res.modo);
+        limpiarFormUsuario();
+        cargarModerador();
+      } catch (err) {
+        toast('Error: ' + err.message);
+      }
+    }
+
+    async function guardarConfigApp() {
+      try {
+        const res = await apiCall('guardarConfiguracion', {
+          PLANTA_OBJETIVO: document.getElementById('cfg-planta').value.trim(),
+          META_MINUTOS: Number(document.getElementById('cfg-meta').value) || 45,
+          FILTRO_DEPOSITO: document.getElementById('cfg-filtro').value
+        }, currentUser.correo);
+        appConfig = res.config;
+        toast('Configuración guardada.');
+        refrescarEstado();
+      } catch (err) {
+        toast('Error: ' + err.message);
+      }
+    }
+
+    (function initAutoLogin() {
+      try {
+        const raw = localStorage.getItem(STORAGE_SESSION_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (saved && saved.id && saved.pass) {
+          document.getElementById('login-id').value = saved.id;
+          document.getElementById('login-pass').value = saved.pass;
+          document.getElementById('login-remember').checked = true;
+          doLogin();
+        }
+      } catch (e) {}
+    })();
+  </script>
+</body>
+</html>
