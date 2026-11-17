@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pn8000-descarga-v2.9';
+const CACHE_NAME = 'pn8000-descarga-v3.0';
 const ASSETS = ['./', './index.html', './manifest.json?v=3', './icon-192.png?v=3', './icon-512.png?v=3'];
 
 self.addEventListener('install', event => {
