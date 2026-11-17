@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pn8000-descarga-v2.7';
+const CACHE_NAME = 'pn8000-descarga-v2.8';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
@@ -17,8 +17,11 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  const req = event.request.mode === 'navigate'
+    ? new Request(event.request.url, { cache: 'no-store' })
+    : event.request;
   event.respondWith(
-    fetch(event.request)
+    fetch(req)
       .then(res => {
         const clone = res.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
