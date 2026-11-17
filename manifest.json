@@ -1,7 +1,7 @@
 {
-  "name": "Control Descarga PN8000",
-  "short_name": "Descarga PN8000",
-  "description": "Medición de tiempos de descarga de camiones - Planta PN8000",
+  "name": "CCU Control de Tiempos",
+  "short_name": "CCU Tiempos",
+  "description": "Medición de tiempos de descarga - CCU",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -10,13 +10,13 @@
   "theme_color": "#007a33",
   "icons": [
     {
-      "src": "./icon-192.png",
+      "src": "./icon-192.png?v=3",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "./icon-512.png",
+      "src": "./icon-512.png?v=3",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
