@@ -298,8 +298,9 @@
               <label style="display:flex; align-items:center; gap:5px; text-transform:none; color:var(--text);"><input type="checkbox" class="u-func" value="MODERADOR" style="width:auto;" /> Moderador</label>
             </div>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="guardarUsuarioApp()">💾 Guardar Usuario</button>
+          <button class="btn btn-primary btn-sm" id="btn-guardar-usuario" onclick="guardarUsuarioApp()">💾 Guardar Usuario</button>
           <button class="btn btn-outline btn-sm" onclick="limpiarFormUsuario()">Limpiar</button>
+          <div id="u-msg" style="margin-top:8px; font-size:13px; font-weight:700;"></div>
         </div>
 
         <div class="card">
@@ -801,20 +802,39 @@
 
     async function guardarUsuarioApp() {
       const funcs = Array.from(document.querySelectorAll('.u-func:checked')).map(cb => cb.value);
+      const userData = {
+        correo: document.getElementById('u-correo').value.trim(),
+        usuario: document.getElementById('u-usuario').value.trim(),
+        nombre: document.getElementById('u-nombre').value.trim(),
+        clave: document.getElementById('u-clave').value.trim(),
+        rol: document.getElementById('u-rol').value,
+        activo: document.getElementById('u-activo').value === 'true',
+        funciones: funcs
+      };
+      const msgEl = document.getElementById('u-msg');
+      const btn = document.getElementById('btn-guardar-usuario');
+      msgEl.textContent = '';
+      if ((!userData.correo && !userData.usuario) || !userData.clave) {
+        msgEl.style.color = 'var(--red)';
+        msgEl.textContent = '⚠️ Debes ingresar Correo (o Usuario) y Clave.';
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = '⏳ Guardando...';
       try {
-        const res = await apiCall('guardarUsuario', {
-          correo: document.getElementById('u-correo').value.trim(),
-          usuario: document.getElementById('u-usuario').value.trim(),
-          nombre: document.getElementById('u-nombre').value.trim(),
-          clave: document.getElementById('u-clave').value.trim(),
-          rol: document.getElementById('u-rol').value,
-          activo: document.getElementById('u-activo').value === 'true',
-          funciones: funcs
-        }, currentUser.correo);
+        const res = await apiCall('guardarUsuario', userData, currentUser.correo);
+        btn.disabled = false;
+        btn.textContent = '💾 Guardar Usuario';
+        msgEl.style.color = 'var(--green)';
+        msgEl.textContent = `✅ Usuario ${res.usuario} (${res.correo}) ${res.modo}.`;
         toast('Usuario ' + res.modo);
         limpiarFormUsuario();
         cargarModerador();
       } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '💾 Guardar Usuario';
+        msgEl.style.color = 'var(--red)';
+        msgEl.textContent = '❌ ' + err.message;
         toast('Error: ' + err.message);
       }
     }
