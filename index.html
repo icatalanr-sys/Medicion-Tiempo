@@ -134,7 +134,12 @@
       </div>
       <div style="margin-bottom:14px;">
         <label>Clave / PIN</label>
-        <input type="password" id="login-pass" placeholder="••••" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()" />
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="login-pass" placeholder="••••" autocomplete="current-password"
+                 style="padding-right:44px;" onkeydown="if(event.key==='Enter') doLogin()" />
+          <button type="button" onclick="togglePasswordVis('login-pass', this)" title="Mostrar/Ocultar clave"
+                  style="position:absolute; right:8px; background:none; border:none; font-size:18px; cursor:pointer; padding:4px; min-height:auto;">👁️</button>
+        </div>
       </div>
       <div style="margin-bottom:16px; display:flex; align-items:center; gap:8px;">
         <input type="checkbox" id="login-remember" style="width:18px; height:18px; cursor:pointer;" />
@@ -272,7 +277,14 @@
             <div><label>Nombre Completo</label><input type="text" id="u-nombre" placeholder="Juan Pérez" /></div>
           </div>
           <div class="grid-3" style="margin-bottom:10px;">
-            <div><label>Clave / PIN *</label><input type="text" id="u-clave" placeholder="1234" /></div>
+            <div>
+              <label>Clave / PIN *</label>
+              <div style="position:relative; display:flex; align-items:center;">
+                <input type="password" id="u-clave" placeholder="••••" style="padding-right:44px;" />
+                <button type="button" onclick="togglePasswordVis('u-clave', this)" title="Mostrar/Ocultar clave"
+                        style="position:absolute; right:8px; background:none; border:none; font-size:18px; cursor:pointer; padding:4px; min-height:auto;">👁️</button>
+              </div>
+            </div>
             <div>
               <label>Rol</label>
               <select id="u-rol">
@@ -389,6 +401,14 @@
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || 'Error en el servidor.');
       return json.data;
+    }
+
+    function togglePasswordVis(inputId, btn) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      const esPass = inp.type === 'password';
+      inp.type = esPass ? 'text' : 'password';
+      if (btn) btn.textContent = esPass ? '🙈' : '👁️';
     }
 
     function toast(msg) {
@@ -774,7 +794,10 @@
             <td>${u.correo}</td><td><strong>${u.usuario}</strong></td><td>${u.nombre}</td>
             <td><span class="pill pill-blue">${u.rol}</span></td><td>${u.funciones}</td>
             <td><span class="pill ${u.activo ? 'pill-green' : 'pill-red'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
-            <td><button class="btn btn-outline btn-sm" onclick='editarUsuario(${JSON.stringify(u)})'>✏️</button></td>
+            <td style="display:flex; gap:6px;">
+              <button class="btn btn-outline btn-sm" onclick='editarUsuario(${JSON.stringify(u)})'>✏️</button>
+              <button class="btn btn-outline btn-sm" style="color:var(--red); border-color:#fca5a5;" onclick="eliminarUsuarioApp('${u.correo}', '${u.usuario}')">🗑️</button>
+            </td>
           </tr>
         `).join('');
       } catch (err) {
@@ -835,6 +858,17 @@
         btn.textContent = '💾 Guardar Usuario';
         msgEl.style.color = 'var(--red)';
         msgEl.textContent = '❌ ' + err.message;
+        toast('Error: ' + err.message);
+      }
+    }
+
+    async function eliminarUsuarioApp(correo, usuario) {
+      if (!confirm(`¿Seguro que deseas eliminar al usuario "${usuario}" (${correo})?`)) return;
+      try {
+        await apiCall('eliminarUsuario', correo, currentUser.correo);
+        toast('🗑️ Usuario eliminado.');
+        cargarModerador();
+      } catch (err) {
         toast('Error: ' + err.message);
       }
     }
