@@ -236,7 +236,7 @@
             </div>
 
             <button class="btn btn-start" id="btn-iniciar" onclick="iniciarDescargaApp()">
-              ▶ INICIAR DESCARGA
+              ▶ INICIAR TEMPORIZADOR
             </button>
           </div>
         </div>
@@ -334,7 +334,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '2.4';
+    const CLIENT_APP_VERSION = '2.6';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
 
     let currentUser = null;
@@ -351,7 +351,17 @@
     let deferredPrompt = null;
 
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              mostrarModalActualizacionPWA();
+            }
+          });
+        });
+      }).catch(() => {});
     }
 
     window.addEventListener('beforeinstallprompt', e => {
@@ -436,21 +446,19 @@
       refrescarEstado();
 
       if (versionCheckInterval) clearInterval(versionCheckInterval);
-      versionCheckInterval = setInterval(async () => {
-        try {
-          const v = await apiCall('getAppVersion');
-          verificarVersion(v);
-        } catch (e) {}
+      versionCheckInterval = setInterval(() => {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistration().then(reg => { if (reg) reg.update(); }).catch(() => {});
+        }
       }, 60000);
     }
 
-    function verificarVersion(serverVersion) {
-      if (!serverVersion || serverVersion === CLIENT_APP_VERSION) return;
-      if (versionPostergada === serverVersion) return;
+    function mostrarModalActualizacionPWA() {
+      if (versionPostergada) return;
       const modal = document.getElementById('modal-actualizacion');
       if (!modal.classList.contains('hidden')) return;
 
-      document.getElementById('upd-version-lbl').textContent = 'v' + serverVersion;
+      document.getElementById('upd-version-lbl').textContent = 'Nueva versión';
       let seg = 5;
       document.getElementById('upd-countdown').textContent = seg;
       modal.classList.remove('hidden');
@@ -486,7 +494,6 @@
     async function refrescarEstado() {
       try {
         const res = await apiCall('getEstadoInicial', currentUser.correo);
-        verificarVersion(res.appVersion);
         appConfig = res.config || appConfig;
         eettList = res.eetts || [];
         viajesLocales = res.viajesLocales || [];
@@ -715,14 +722,14 @@
       try {
         const res = await apiCall('iniciarDescarga', payload);
         btn.disabled = false;
-        btn.textContent = '▶ INICIAR DESCARGA';
+        btn.textContent = '▶ INICIAR TEMPORIZADOR';
         activosList = res.activos || [];
         renderActivos();
         limpiarFormularioToma();
         toast('⏱️ Descarga iniciada para ' + patente);
       } catch (err) {
         btn.disabled = false;
-        btn.textContent = '▶ INICIAR DESCARGA';
+        btn.textContent = '▶ INICIAR TEMPORIZADOR';
         toast('Error: ' + err.message);
       }
     }
