@@ -355,7 +355,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '2.6';
+    const CLIENT_APP_VERSION = '3.5';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
 
     let currentUser = null;
@@ -372,17 +372,7 @@
     let deferredPrompt = null;
 
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').then(reg => {
-        reg.addEventListener('updatefound', () => {
-          const nw = reg.installing;
-          if (!nw) return;
-          nw.addEventListener('statechange', () => {
-            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-              mostrarModalActualizacionPWA();
-            }
-          });
-        });
-      }).catch(() => {});
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
     }
 
     window.addEventListener('beforeinstallprompt', e => {
@@ -475,19 +465,27 @@
       refrescarEstado();
 
       if (versionCheckInterval) clearInterval(versionCheckInterval);
-      versionCheckInterval = setInterval(() => {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistration().then(reg => { if (reg) reg.update(); }).catch(() => {});
-        }
-      }, 60000);
+      checkPwaVersion();
+      versionCheckInterval = setInterval(checkPwaVersion, 30000);
     }
 
-    function mostrarModalActualizacionPWA() {
-      if (versionPostergada) return;
+    async function checkPwaVersion() {
+      try {
+        const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.version && data.version !== CLIENT_APP_VERSION) {
+          mostrarModalActualizacionPWA(data.version);
+        }
+      } catch (e) {}
+    }
+
+    function mostrarModalActualizacionPWA(newVer) {
+      if (versionPostergada === newVer) return;
       const modal = document.getElementById('modal-actualizacion');
       if (!modal.classList.contains('hidden')) return;
 
-      document.getElementById('upd-version-lbl').textContent = 'Nueva versión';
+      document.getElementById('upd-version-lbl').textContent = newVer ? ('v' + newVer) : 'Nueva versión';
       let seg = 5;
       document.getElementById('upd-countdown').textContent = seg;
       modal.classList.remove('hidden');
@@ -498,7 +496,7 @@
         document.getElementById('upd-countdown').textContent = seg;
         if (seg <= 0) {
           clearInterval(updateCountdownTimer);
-          window.location.reload();
+          window.location.reload(true);
         }
       }, 1000);
     }
