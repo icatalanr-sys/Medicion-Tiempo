@@ -191,9 +191,10 @@
             <span style="font-size:12px; color:var(--muted);" id="lbl-maestra-info"></span>
           </div>
 
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px;">
             <button type="button" class="btn btn-primary" id="btn-modo-carga" onclick="cambiarModoOperacion('CARGA')">📦 CARGA (Hoy)</button>
             <button type="button" class="btn btn-outline" id="btn-modo-descarga" onclick="cambiarModoOperacion('DESCARGA')">📥 DESCARGA (ID Viaje)</button>
+            <button type="button" class="btn btn-outline" id="btn-modo-dc" onclick="cambiarModoOperacion('D+C')">🔄 D+C (Unión)</button>
           </div>
 
           <div class="grid-2" style="align-items:end; margin-bottom:12px;">
@@ -214,6 +215,7 @@
           </div>
 
           <div id="box-resultados-viajes" class="hidden" style="margin-bottom:14px;">
+            <div id="banner-auto-dc" class="hidden" style="margin-bottom:10px; padding:10px 12px; border-radius:10px; background:#eff6ff; border:1.5px solid #3b82f6; color:#1e40af; font-size:13px;"></div>
             <label id="lbl-resultados-titulo">Selecciona el viaje correspondiente:</label>
             <div id="lista-viajes-encontrados"></div>
           </div>
@@ -246,6 +248,7 @@
                 <select id="sel-operacion">
                   <option value="CARGA">📦 CARGA</option>
                   <option value="DESCARGA">📥 DESCARGA</option>
+                  <option value="D+C">🔄 D+C (Descarga + Carga)</option>
                 </select>
               </div>
               <div>
@@ -421,7 +424,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '4.0';
+    const CLIENT_APP_VERSION = '4.1';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
 
     let currentUser = null;
@@ -727,7 +730,7 @@
             </div>
             <div style="font-size:13px; font-weight:600; color:var(--primary); margin-top:2px;">${a.eett}</div>
             <div class="trip-meta">
-              <span class="pill ${a.tipoOperacion === 'CARGA' ? 'pill-amber' : 'pill-green'}">${a.tipoOperacion === 'CARGA' ? '📦 CARGA' : '📥 DESCARGA'}</span>
+              <span class="pill ${a.tipoOperacion === 'CARGA' ? 'pill-amber' : (a.tipoOperacion === 'D+C' ? 'pill-blue' : 'pill-green')}">${a.tipoOperacion === 'CARGA' ? '📦 CARGA' : (a.tipoOperacion === 'D+C' ? '🔄 D+C' : '📥 DESCARGA')}</span>
               <span class="pill">🕒 Llegada: ${a.horaInicioTexto}</span>
               ${a.idViaje ? `<span class="pill pill-blue">Viaje ${a.idViaje}</span>` : `<span class="pill pill-red">MANUAL</span>`}
               <span class="pill">${a.pallets} pallets</span>
@@ -764,21 +767,74 @@
     let modoOperacionActual = 'CARGA';
 
     function cambiarModoOperacion(modo) {
-      modoOperacionActual = modo === 'DESCARGA' ? 'DESCARGA' : 'CARGA';
+      modoOperacionActual = (modo === 'DESCARGA' || modo === 'D+C') ? modo : 'CARGA';
       const bCarga = document.getElementById('btn-modo-carga');
       const bDesc = document.getElementById('btn-modo-descarga');
+      const bDc = document.getElementById('btn-modo-dc');
+      bCarga.className = modoOperacionActual === 'CARGA' ? 'btn btn-primary' : 'btn btn-outline';
+      bDesc.className = modoOperacionActual === 'DESCARGA' ? 'btn btn-primary' : 'btn btn-outline';
+      if (bDc) bDc.className = modoOperacionActual === 'D+C' ? 'btn btn-primary' : 'btn btn-outline';
       if (modoOperacionActual === 'CARGA') {
-        bCarga.className = 'btn btn-primary';
-        bDesc.className = 'btn btn-outline';
         document.getElementById('lbl-busqueda-input').textContent = '1. Patente del Tracto (o ID de Viaje) — Jornada Hoy';
         document.getElementById('inp-patente').placeholder = 'EJ: TVHZ13';
-      } else {
-        bCarga.className = 'btn btn-outline';
-        bDesc.className = 'btn btn-primary';
+      } else if (modoOperacionActual === 'DESCARGA') {
         document.getElementById('lbl-busqueda-input').textContent = '1. ID de Viaje (o Patente) — Todas las jornadas';
         document.getElementById('inp-patente').placeholder = 'EJ: 743416';
+      } else {
+        document.getElementById('lbl-busqueda-input').textContent = '1. Patente o ID de Viaje — Unión Descarga + Carga (PN8000)';
+        document.getElementById('inp-patente').placeholder = 'EJ: TVHZ13 o 743416';
       }
       limpiarFormularioToma();
+    }
+
+    function emparejarViajesDC(viajes, pNorm) {
+      const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const descargas = (viajes || []).filter(v => v.tipoOperacion === 'DESCARGA');
+      const cargas = (viajes || []).filter(v => v.tipoOperacion === 'CARGA');
+      const pairs = [];
+      descargas.forEach(d => {
+        const keyD = norm(d.vehiculoSecundario || d.vehiculo);
+        if (!keyD) return;
+        cargas.forEach(c => {
+          const keyC = norm(c.vehiculoSecundario || c.vehiculo);
+          if (!keyC || keyD !== keyC) return;
+          const idD = norm(d.idViaje);
+          const idC = norm(c.idViaje);
+          const v1N = norm(c.vehiculo || d.vehiculo);
+          const v2N = norm(c.vehiculoSecundario || d.vehiculoSecundario);
+          const matchExact = !pNorm || keyD === pNorm || v2N === pNorm || idD === pNorm || idC === pNorm;
+          const matchPartial = !pNorm || (pNorm.length >= 4 && (keyD.includes(pNorm) || v2N.includes(pNorm) || v1N.includes(pNorm) || idD.includes(pNorm) || idC.includes(pNorm)));
+          if (!matchExact && !matchPartial) return;
+          const palD = Number(d.palletsDespachados || d.palletsPlanificados) || 0;
+          const palC = Number(c.palletsDespachados || c.palletsPlanificados) || 0;
+          pairs.push({
+            idViaje: d.idViaje + ' + ' + c.idViaje,
+            estado: c.estado || d.estado,
+            palletsPlanificados: (Number(d.palletsPlanificados) || 0) + (Number(c.palletsPlanificados) || 0),
+            palletsDespachados: palD + palC,
+            categoria: c.categoria || d.categoria,
+            jornada: 'D:' + d.jornada + ' / C:' + c.jornada,
+            tipoVehiculo: c.tipoVehiculo || d.tipoVehiculo,
+            vehiculo: c.vehiculo || d.vehiculo,
+            vehiculoSecundario: c.vehiculoSecundario || d.vehiculoSecundario,
+            depositoOrigen: d.depositoOrigen,
+            depositoDestino: c.depositoDestino,
+            eett: c.eett || d.eett,
+            codigoEETT: c.codigoEETT || d.codigoEETT,
+            comentario: [d.comentario, c.comentario].filter(Boolean).join(' | '),
+            tipoOperacion: 'D+C',
+            detalleDC: `Descarga (${d.idViaje}: ${d.depositoOrigen} → ${d.depositoDestino}, ${palD} pal) + Carga (${c.idViaje}: ${c.depositoOrigen} → ${c.depositoDestino}, ${palC} pal)`,
+            prio: matchExact ? 0 : 2
+          });
+        });
+      });
+      return pairs.sort((a, b) => a.prio - b.prio);
+    }
+
+    function cambiarADCyBuscar(pat) {
+      cambiarModoOperacion('D+C');
+      document.getElementById('inp-patente').value = pat;
+      buscarPorPatente();
     }
 
     function actualizarYLimpiarBusqueda() {
@@ -795,17 +851,32 @@
       modoManualActivo = false;
       document.getElementById('box-alerta-manual').classList.add('hidden');
       document.getElementById('box-resultados-viajes').classList.remove('hidden');
+
+      const bannerDc = document.getElementById('banner-auto-dc');
+      if (bannerDc) {
+        const patKey = String(viajes[0].vehiculoSecundario || viajes[0].vehiculo || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const dcPairs = (modoOperacionActual !== 'D+C' && patKey && viajesLocales.length > 0) ? emparejarViajesDC(viajesLocales, patKey) : [];
+        if (dcPairs.length > 0) {
+          bannerDc.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;"><span>🔄 <strong>Unión de Flujo detectada (D+C):</strong> La patente <strong>${patKey}</strong> tiene viaje de DESCARGA + CARGA en PN8000.</span><button type="button" class="btn btn-primary btn-sm" onclick="cambiarADCyBuscar('${String(pat || '').replace(/'/g, "\\'")}')">Cambiar a 🔄 D+C</button></div>`;
+          bannerDc.classList.remove('hidden');
+        } else {
+          bannerDc.classList.add('hidden');
+          bannerDc.innerHTML = '';
+        }
+      }
+
       document.getElementById('lbl-resultados-titulo').textContent =
         viajes.length > 1
-          ? `Se encontraron ${viajes.length} viajes para ${pat}. Elige cuál estás descargando:`
+          ? `Se encontraron ${viajes.length} viajes para ${pat}. Elige cuál estás operando:`
           : `Viaje encontrado para ${pat}:`;
 
       document.getElementById('lista-viajes-encontrados').innerHTML = viajes.map((v, idx) => `
         <div class="trip-option ${idx === 0 ? 'selected' : ''}" onclick="seleccionarViaje(${idx})" id="trip-opt-${idx}">
           <div style="display:flex; justify-content:space-between; font-weight:700; flex-wrap:wrap; gap:6px;">
             <span>Tracto: ${v.vehiculoSecundario || v.vehiculo} — ${v.eett}</span>
-            <span class="pill ${v.tipoOperacion === 'CARGA' ? 'pill-amber' : 'pill-green'}">${v.tipoOperacion === 'CARGA' ? '📦 CARGA' : '📥 DESCARGA'}</span>
+            <span class="pill ${v.tipoOperacion === 'CARGA' ? 'pill-amber' : (v.tipoOperacion === 'D+C' ? 'pill-blue' : 'pill-green')}">${v.tipoOperacion === 'CARGA' ? '📦 CARGA' : (v.tipoOperacion === 'D+C' ? '🔄 D+C' : '📥 DESCARGA')}</span>
           </div>
+          ${v.detalleDC ? `<div style="font-size:12px; color:#1e40af; margin-top:6px; font-weight:600;">🔄 ${v.detalleDC}</div>` : ''}
           <div class="trip-meta">
             <span class="pill pill-blue">Viaje ${v.idViaje}</span>
             <span class="pill">${v.depositoOrigen} → ${v.depositoDestino}</span>
@@ -831,11 +902,17 @@
       window._viajesEncontrados = [];
       modoManualActivo = false;
       document.getElementById('box-resultados-viajes').classList.add('hidden');
+      const bDc = document.getElementById('banner-auto-dc');
+      if (bDc) { bDc.classList.add('hidden'); bDc.innerHTML = ''; }
       document.getElementById('lista-viajes-encontrados').innerHTML = '';
       document.getElementById('box-alerta-manual').classList.add('hidden');
       document.getElementById('box-form-descarga').classList.add('hidden');
 
       if (!incluirOtros && viajesLocales.length > 0) {
+        if (modoOperacionActual === 'D+C') {
+          mostrarResultadosBusqueda(emparejarViajesDC(viajesLocales, pNorm), pat);
+          return;
+        }
         const localMatches = viajesLocales
           .filter(v => v.tipoOperacion === modoOperacionActual)
           .map(v => {
@@ -901,6 +978,8 @@
       modoManualActivo = true;
       selectedTrip = null;
       document.getElementById('box-resultados-viajes').classList.add('hidden');
+      const bDc = document.getElementById('banner-auto-dc');
+      if (bDc) { bDc.classList.add('hidden'); bDc.innerHTML = ''; }
       document.getElementById('box-alerta-manual').classList.remove('hidden');
       document.getElementById('box-form-descarga').classList.remove('hidden');
       poblarSelectEett('');
@@ -979,6 +1058,8 @@
       document.getElementById('inp-obs').value = '';
       document.getElementById('inp-eett-manual').value = '';
       document.getElementById('box-resultados-viajes').classList.add('hidden');
+      const bDc = document.getElementById('banner-auto-dc');
+      if (bDc) { bDc.classList.add('hidden'); bDc.innerHTML = ''; }
       document.getElementById('box-alerta-manual').classList.add('hidden');
       document.getElementById('box-form-descarga').classList.add('hidden');
       selectedTrip = null;
