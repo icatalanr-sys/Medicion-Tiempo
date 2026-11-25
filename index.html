@@ -187,14 +187,19 @@
 
         <div class="card">
           <div class="card-title">
-            <span>➕ Registrar Nueva Descarga</span>
+            <span>➕ Registrar Nueva Operación</span>
             <span style="font-size:12px; color:var(--muted);" id="lbl-maestra-info"></span>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;">
+            <button type="button" class="btn btn-primary" id="btn-modo-carga" onclick="cambiarModoOperacion('CARGA')">📦 CARGA (Hoy)</button>
+            <button type="button" class="btn btn-outline" id="btn-modo-descarga" onclick="cambiarModoOperacion('DESCARGA')">📥 DESCARGA (ID Viaje)</button>
           </div>
 
           <div class="grid-2" style="align-items:end; margin-bottom:12px;">
             <div>
-              <label>1. Patente (Tracto) o ID de Viaje</label>
-              <input type="text" id="inp-patente" class="input-patente" placeholder="EJ: TVHZ13 o 743416" onkeydown="if(event.key==='Enter') buscarPorPatente()" />
+              <label id="lbl-busqueda-input">1. Patente del Tracto (o ID de Viaje) — Jornada Hoy</label>
+              <input type="text" id="inp-patente" class="input-patente" placeholder="EJ: TVHZ13" onkeydown="if(event.key==='Enter') buscarPorPatente()" />
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="btn btn-primary" id="btn-buscar-patente" style="flex:1;" onclick="buscarPorPatente()">🔍 Buscar en Excel</button>
@@ -416,7 +421,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '3.9';
+    const CLIENT_APP_VERSION = '4.0';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
 
     let currentUser = null;
@@ -756,6 +761,26 @@
       });
     }
 
+    let modoOperacionActual = 'CARGA';
+
+    function cambiarModoOperacion(modo) {
+      modoOperacionActual = modo === 'DESCARGA' ? 'DESCARGA' : 'CARGA';
+      const bCarga = document.getElementById('btn-modo-carga');
+      const bDesc = document.getElementById('btn-modo-descarga');
+      if (modoOperacionActual === 'CARGA') {
+        bCarga.className = 'btn btn-primary';
+        bDesc.className = 'btn btn-outline';
+        document.getElementById('lbl-busqueda-input').textContent = '1. Patente del Tracto (o ID de Viaje) — Jornada Hoy';
+        document.getElementById('inp-patente').placeholder = 'EJ: TVHZ13';
+      } else {
+        bCarga.className = 'btn btn-outline';
+        bDesc.className = 'btn btn-primary';
+        document.getElementById('lbl-busqueda-input').textContent = '1. ID de Viaje (o Patente) — Todas las jornadas';
+        document.getElementById('inp-patente').placeholder = 'EJ: 743416';
+      }
+      limpiarFormularioToma();
+    }
+
     function actualizarYLimpiarBusqueda() {
       limpiarFormularioToma();
       refrescarEstado();
@@ -811,18 +836,29 @@
       document.getElementById('box-form-descarga').classList.add('hidden');
 
       if (!incluirOtros && viajesLocales.length > 0) {
-        const localMatches = viajesLocales.map(v => {
-          const idN = String(v.idViaje || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-          const v1 = String(v.vehiculo || '').replace(/[^A-Z0-9]/g, '');
-          const v2 = String(v.vehiculoSecundario || '').replace(/[^A-Z0-9]/g, '');
-          const com = String(v.comentario || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-          let prio = 99;
-          if (idN === pNorm || v2 === pNorm) prio = 0;
-          else if (idN.includes(pNorm) || v2.includes(pNorm)) prio = 2;
-          else if (v1 === pNorm || v1.includes(pNorm)) prio = 5;
-          else if (com.includes(pNorm)) prio = 10;
-          return prio < 99 ? { v, prio } : null;
-        }).filter(Boolean).sort((a, b) => a.prio - b.prio).map(x => x.v);
+        const localMatches = viajesLocales
+          .filter(v => v.tipoOperacion === modoOperacionActual)
+          .map(v => {
+            const idN = String(v.idViaje || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            const v1 = String(v.vehiculo || '').replace(/[^A-Z0-9]/g, '');
+            const v2 = String(v.vehiculoSecundario || '').replace(/[^A-Z0-9]/g, '');
+            const com = String(v.comentario || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            let prio = 99;
+            if (modoOperacionActual === 'DESCARGA') {
+              if (idN === pNorm) prio = 0;
+              else if (idN.includes(pNorm)) prio = 1;
+              else if (v2 === pNorm) prio = 2;
+              else if (v2.includes(pNorm)) prio = 3;
+              else if (v1 === pNorm || v1.includes(pNorm)) prio = 5;
+              else if (com.includes(pNorm)) prio = 10;
+            } else {
+              if (v2 === pNorm || idN === pNorm) prio = 0;
+              else if (v2.includes(pNorm) || idN.includes(pNorm)) prio = 2;
+              else if (v1 === pNorm || v1.includes(pNorm)) prio = 5;
+              else if (com.includes(pNorm)) prio = 10;
+            }
+            return prio < 99 ? { v, prio } : null;
+          }).filter(Boolean).sort((a, b) => a.prio - b.prio).map(x => x.v);
         mostrarResultadosBusqueda(localMatches, pat);
         return;
       }
@@ -831,7 +867,7 @@
       btn.disabled = true;
       btn.textContent = '⏳ Buscando...';
       try {
-        const res = await apiCall('buscarPatente', pat, currentUser.correo, incluirOtros);
+        const res = await apiCall('buscarPatente', pat, currentUser.correo, incluirOtros, modoOperacionActual);
         btn.disabled = false;
         btn.textContent = '🔍 Buscar en Excel';
         if (res.eetts && res.eetts.length) eettList = res.eetts;
@@ -868,7 +904,7 @@
       document.getElementById('box-alerta-manual').classList.remove('hidden');
       document.getElementById('box-form-descarga').classList.remove('hidden');
       poblarSelectEett('');
-      document.getElementById('sel-operacion').value = 'CARGA';
+      document.getElementById('sel-operacion').value = modoOperacionActual;
       ['inp-id-viaje','inp-pallets','inp-tipo-veh','inp-categoria','inp-origen','inp-patente-sec','inp-obs'].forEach(id => document.getElementById(id).value = '');
     }
 
