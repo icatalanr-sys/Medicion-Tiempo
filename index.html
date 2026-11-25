@@ -416,7 +416,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '3.8';
+    const CLIENT_APP_VERSION = '3.9';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
 
     let currentUser = null;
@@ -1020,7 +1020,8 @@
       document.getElementById('u-correo').value = u.correo;
       document.getElementById('u-usuario').value = u.usuario;
       document.getElementById('u-nombre').value = u.nombre;
-      document.getElementById('u-clave').value = u.clave;
+      document.getElementById('u-clave').value = '';
+      document.getElementById('u-clave').placeholder = 'Dejar vacío para mantener clave actual';
       document.getElementById('u-rol').value = u.rol;
       document.getElementById('u-activo').value = String(u.activo);
       const funcs = String(u.funciones || '').split(',').map(s => s.trim());
@@ -1029,6 +1030,7 @@
 
     function limpiarFormUsuario() {
       ['u-correo','u-usuario','u-nombre','u-clave'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('u-clave').placeholder = 'Vacío = el usuario la crea';
       document.getElementById('u-rol').value = 'OPERADOR';
       document.getElementById('u-activo').value = 'true';
       document.querySelectorAll('.u-func').forEach(cb => cb.checked = cb.value === 'TIEMPOS');
