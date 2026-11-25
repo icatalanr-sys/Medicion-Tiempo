@@ -61,6 +61,7 @@
     input, select {
       width: 100%; padding: 11px 12px; border: 2px solid #94a3b8; border-radius: 10px;
       font-size: 16px; font-weight: 600; background: #ffffff; color: #020617; outline: none;
+      -webkit-user-select: text !important; user-select: text !important; pointer-events: auto !important;
     }
     input:focus, select:focus { border-color: var(--primary); }
     .input-patente { font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; text-align: center; }
@@ -191,8 +192,8 @@
 
           <div class="grid-2" style="align-items:end; margin-bottom:12px;">
             <div>
-              <label>1. Patente del Camión (Principal o Rampla)</label>
-              <input type="text" id="inp-patente" class="input-patente" placeholder="EJ: JJJJ24" onkeydown="if(event.key==='Enter') buscarPorPatente()" />
+              <label>1. Patente del Tracto (Vehículo Secundario)</label>
+              <input type="text" id="inp-patente" class="input-patente" placeholder="EJ: KRPC72" onkeydown="if(event.key==='Enter') buscarPorPatente()" />
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="btn btn-primary" id="btn-buscar-patente" style="flex:1;" onclick="buscarPorPatente()">🔍 Buscar en Excel</button>
@@ -223,7 +224,7 @@
             <input type="hidden" id="inp-patente-sec" />
             <input type="hidden" id="inp-tipo-veh" />
 
-            <div class="grid-2" style="margin-bottom:14px;">
+            <div class="grid-3" style="margin-bottom:14px;">
               <div>
                 <label>2. Empresa de Transporte (EETT) *</label>
                 <select id="sel-eett" onchange="onChangeEettSelect()">
@@ -235,7 +236,14 @@
                 <input type="text" id="inp-eett-manual" placeholder="Nombre empresa de transporte" />
               </div>
               <div>
-                <label>3. Observación (Opcional)</label>
+                <label>3. Tipo de Operación *</label>
+                <select id="sel-operacion">
+                  <option value="CARGA">📦 CARGA</option>
+                  <option value="DESCARGA">📥 DESCARGA</option>
+                </select>
+              </div>
+              <div>
+                <label>4. Observación (Opcional)</label>
                 <input type="text" id="inp-obs" placeholder="Comentarios adicionales (opcional)" />
               </div>
             </div>
@@ -573,10 +581,11 @@
             </div>
             <div style="font-size:13px; font-weight:600; color:var(--primary); margin-top:2px;">${a.eett}</div>
             <div class="trip-meta">
+              <span class="pill ${a.tipoOperacion === 'CARGA' ? 'pill-amber' : 'pill-green'}">${a.tipoOperacion === 'CARGA' ? '📦 CARGA' : '📥 DESCARGA'}</span>
+              <span class="pill">🕒 Llegada: ${a.horaInicioTexto}</span>
               ${a.idViaje ? `<span class="pill pill-blue">Viaje ${a.idViaje}</span>` : `<span class="pill pill-red">MANUAL</span>`}
               <span class="pill">${a.pallets} pallets</span>
               ${a.tipoVehiculo ? `<span class="pill">${a.tipoVehiculo}</span>` : ''}
-              <span class="pill">Inicio: ${a.horaInicioTexto}</span>
             </div>
             ${a.observacion ? `<div style="margin-top:8px; padding:6px 8px; background:#f1f5f9; border-radius:8px; font-size:12px; color:#1e293b;">💬 ${a.observacion}</div>` : ''}
           </div>
@@ -627,14 +636,16 @@
 
       document.getElementById('lista-viajes-encontrados').innerHTML = viajes.map((v, idx) => `
         <div class="trip-option ${idx === 0 ? 'selected' : ''}" onclick="seleccionarViaje(${idx})" id="trip-opt-${idx}">
-          <div style="display:flex; justify-content:space-between; font-weight:700;">
-            <span>ID Viaje: ${v.idViaje} — ${v.eett}</span>
-            <span class="pill ${v.esPlantaObjetivo !== false ? 'pill-green' : 'pill-amber'}">${v.depositoOrigen} → ${v.depositoDestino}</span>
+          <div style="display:flex; justify-content:space-between; font-weight:700; flex-wrap:wrap; gap:6px;">
+            <span>Tracto: ${v.vehiculoSecundario || v.vehiculo} — ${v.eett}</span>
+            <span class="pill ${v.tipoOperacion === 'CARGA' ? 'pill-amber' : 'pill-green'}">${v.tipoOperacion === 'CARGA' ? '📦 CARGA' : '📥 DESCARGA'}</span>
           </div>
           <div class="trip-meta">
-            <span class="pill pill-blue">${v.palletsDespachados || v.palletsPlanificados} pallets</span>
+            <span class="pill pill-blue">Viaje ${v.idViaje}</span>
+            <span class="pill">${v.depositoOrigen} → ${v.depositoDestino}</span>
+            <span class="pill">${v.palletsDespachados || v.palletsPlanificados} pallets</span>
             <span class="pill">${v.tipoVehiculo}</span>
-            <span class="pill">${v.categoria}</span>
+            ${v.vehiculo ? `<span class="pill">Rampla: ${v.vehiculo}</span>` : ''}
             <span class="pill">Jornada: ${v.jornada}</span>
           </div>
         </div>
@@ -659,12 +670,17 @@
       document.getElementById('box-form-descarga').classList.add('hidden');
 
       if (!incluirOtros && viajesLocales.length > 0) {
-        const localMatches = viajesLocales.filter(v => {
+        const localMatches = viajesLocales.map(v => {
           const v1 = String(v.vehiculo || '').replace(/[^A-Z0-9]/g, '');
           const v2 = String(v.vehiculoSecundario || '').replace(/[^A-Z0-9]/g, '');
           const com = String(v.comentario || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-          return v1 === pNorm || v2 === pNorm || v1.includes(pNorm) || v2.includes(pNorm) || com.includes(pNorm);
-        });
+          let prio = 99;
+          if (v2 === pNorm) prio = 0;
+          else if (v2.includes(pNorm)) prio = 2;
+          else if (v1 === pNorm || v1.includes(pNorm)) prio = 5;
+          else if (com.includes(pNorm)) prio = 10;
+          return prio < 99 ? { v, prio } : null;
+        }).filter(Boolean).sort((a, b) => a.prio - b.prio).map(x => x.v);
         mostrarResultadosBusqueda(localMatches, pat);
         return;
       }
@@ -693,6 +709,7 @@
       document.getElementById('box-form-descarga').classList.remove('hidden');
 
       poblarSelectEett(v.eett);
+      document.getElementById('sel-operacion').value = v.tipoOperacion || 'CARGA';
       document.getElementById('inp-id-viaje').value = v.idViaje;
       document.getElementById('inp-pallets').value = v.palletsDespachados || v.palletsPlanificados || 0;
       document.getElementById('inp-tipo-veh').value = v.tipoVehiculo || '';
@@ -709,6 +726,7 @@
       document.getElementById('box-alerta-manual').classList.remove('hidden');
       document.getElementById('box-form-descarga').classList.remove('hidden');
       poblarSelectEett('');
+      document.getElementById('sel-operacion').value = 'CARGA';
       ['inp-id-viaje','inp-pallets','inp-tipo-veh','inp-categoria','inp-origen','inp-patente-sec','inp-obs'].forEach(id => document.getElementById(id).value = '');
     }
 
@@ -739,7 +757,8 @@
         jornadaExcel: v.jornada || '',
         estadoExcel: v.estado || '',
         anden: '',
-        observacion: document.getElementById('inp-obs').value.trim()
+        observacion: document.getElementById('inp-obs').value.trim(),
+        tipoOperacion: document.getElementById('sel-operacion').value
       };
 
       const btn = document.getElementById('btn-iniciar');
