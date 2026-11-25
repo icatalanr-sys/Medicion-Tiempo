@@ -162,6 +162,7 @@
       <div class="user-pill">
         <button id="btn-update-pill" class="btn btn-amber btn-sm hidden" onclick="window.location.reload()">🔔 Actualizar</button>
         <span id="lbl-user-info"></span>
+        <button class="btn-logout" onclick="abrirModalCambiarClave()" title="Cambiar mi contraseña">🔑 Clave</button>
         <button class="btn-logout" onclick="doLogout()">Salir</button>
       </div>
     </header>
@@ -286,9 +287,9 @@
           </div>
           <div class="grid-3" style="margin-bottom:10px;">
             <div>
-              <label>Clave / PIN *</label>
+              <label>Clave / PIN (Opcional)</label>
               <div style="position:relative; display:flex; align-items:center;">
-                <input type="password" id="u-clave" placeholder="••••" style="padding-right:44px;" />
+                <input type="password" id="u-clave" placeholder="Vacío = el usuario la crea" style="padding-right:44px;" />
                 <button type="button" onclick="togglePasswordVis('u-clave', this)" title="Mostrar/Ocultar clave"
                         style="position:absolute; right:8px; background:none; border:none; font-size:18px; cursor:pointer; padding:4px; min-height:auto;">👁️</button>
               </div>
@@ -351,11 +352,71 @@
     </div>
   </div>
 
+  <!-- MODAL DEFINIR NUEVA CLAVE (PRIMER INGRESO O REINICIO) -->
+  <div id="modal-definir-clave" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:310; display:flex; align-items:center; justify-content:center; padding:16px;">
+    <div class="card" style="width:100%; max-width:420px; margin:0; border:2px solid var(--primary);">
+      <div class="card-title">
+        <span>🔐 Crea tu contraseña</span>
+        <button class="btn btn-outline btn-sm" onclick="cerrarModalDefinirClave()">✕</button>
+      </div>
+      <p id="def-clave-desc" style="margin:0 0 12px; font-size:14px; color:var(--muted);"></p>
+      <div style="margin-bottom:10px;">
+        <label>Nueva Contraseña (mín. 4 caracteres)</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="def-clave-1" placeholder="••••" style="padding-right:44px;" />
+          <button type="button" onclick="togglePasswordVis('def-clave-1', this)" style="position:absolute; right:8px; background:none; border:none; font-size:18px; cursor:pointer; padding:4px; min-height:auto;">👁️</button>
+        </div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label>Confirmar Contraseña</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="def-clave-2" placeholder="••••" style="padding-right:44px;" onkeydown="if(event.key==='Enter') confirmarNuevaClaveLogin()" />
+          <button type="button" onclick="togglePasswordVis('def-clave-2', this)" style="position:absolute; right:8px; background:none; border:none; font-size:18px; cursor:pointer; padding:4px; min-height:auto;">👁️</button>
+        </div>
+      </div>
+      <div id="def-clave-err" style="color:var(--red); font-size:13px; font-weight:700; margin-bottom:10px;"></div>
+      <button class="btn btn-primary" style="width:100%;" id="btn-def-clave" onclick="confirmarNuevaClaveLogin()">Guardar Contraseña e Ingresar</button>
+    </div>
+  </div>
+
+  <!-- MODAL CAMBIAR MI CONTRASEÑA (USUARIO LOGUEADO) -->
+  <div id="modal-cambiar-clave" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:310; display:flex; align-items:center; justify-content:center; padding:16px;">
+    <div class="card" style="width:100%; max-width:420px; margin:0;">
+      <div class="card-title">
+        <span>🔑 Cambiar Mi Contraseña</span>
+        <button class="btn btn-outline btn-sm" onclick="cerrarModalCambiarClave()">✕</button>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label>Contraseña Actual</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="chg-clave-act" placeholder="••••" style="padding-right:44px;" />
+          <button type="button" onclick="togglePasswordVis('chg-clave-act', this)" style="position:absolute; right:8px; background:none; border:none; font-size:18px; cursor:pointer; padding:4px; min-height:auto;">👁️</button>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label>Nueva Contraseña (mín. 4 caracteres)</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="chg-clave-1" placeholder="••••" style="padding-right:44px;" />
+          <button type="button" onclick="togglePasswordVis('chg-clave-1', this)" style="position:absolute; right:8px; background:none; border:none; font-size:18px; cursor:pointer; padding:4px; min-height:auto;">👁️</button>
+        </div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label>Confirmar Nueva Contraseña</label>
+        <div style="position:relative; display:flex; align-items:center;">
+          <input type="password" id="chg-clave-2" placeholder="••••" style="padding-right:44px;" onkeydown="if(event.key==='Enter') guardarCambioMiClave()" />
+          <button type="button" onclick="togglePasswordVis('chg-clave-2', this)" style="position:absolute; right:8px; background:none; border:none; font-size:18px; cursor:pointer; padding:4px; min-height:auto;">👁️</button>
+        </div>
+      </div>
+      <div id="chg-clave-err" style="color:var(--red); font-size:13px; font-weight:700; margin-bottom:10px;"></div>
+      <button class="btn btn-primary" style="width:100%;" id="btn-chg-clave" onclick="guardarCambioMiClave()">💾 Actualizar Contraseña</button>
+    </div>
+  </div>
+
   <div id="toast"></div>
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '3.6';
+    const CLIENT_APP_VERSION = '3.7';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
 
     let currentUser = null;
@@ -422,7 +483,7 @@
       const remember = document.getElementById('login-remember').checked;
       const errEl = document.getElementById('login-error');
       errEl.textContent = '';
-      if (!id || !pass) { errEl.textContent = 'Completa correo/usuario y clave.'; return; }
+      if (!id) { errEl.textContent = 'Ingresa tu correo o usuario.'; return; }
 
       const btn = document.getElementById('btn-login');
       btn.disabled = true;
@@ -431,6 +492,18 @@
         const user = await apiCall('loginUsuario', id, pass);
         btn.disabled = false;
         btn.textContent = 'Ingresar';
+        if (user && user.requiereCambioClave) {
+          window._pendingResetId = user.correo;
+          document.getElementById('def-clave-desc').textContent =
+            user.motivo === 'NUEVA_CUENTA'
+              ? `Hola ${user.nombre}, tu cuenta aún no tiene contraseña. Crea una para ingresar:`
+              : `Hola ${user.nombre}, el Moderador solicitó que cambies tu contraseña:`;
+          document.getElementById('def-clave-1').value = '';
+          document.getElementById('def-clave-2').value = '';
+          document.getElementById('def-clave-err').textContent = '';
+          document.getElementById('modal-definir-clave').classList.remove('hidden');
+          return;
+        }
         if (remember) localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify({ id: id, pass: pass }));
         else localStorage.removeItem(STORAGE_SESSION_KEY);
         currentUser = user;
@@ -439,6 +512,76 @@
         btn.disabled = false;
         btn.textContent = 'Ingresar';
         localStorage.removeItem(STORAGE_SESSION_KEY);
+        errEl.textContent = err.message;
+      }
+    }
+
+    function cerrarModalDefinirClave() {
+      document.getElementById('modal-definir-clave').classList.add('hidden');
+    }
+
+    async function confirmarNuevaClaveLogin() {
+      const c1 = document.getElementById('def-clave-1').value.trim();
+      const c2 = document.getElementById('def-clave-2').value.trim();
+      const errEl = document.getElementById('def-clave-err');
+      errEl.textContent = '';
+      if (c1.length < 4) { errEl.textContent = 'La contraseña debe tener al menos 4 caracteres.'; return; }
+      if (c1 !== c2) { errEl.textContent = 'Las contraseñas no coinciden.'; return; }
+
+      const btn = document.getElementById('btn-def-clave');
+      btn.disabled = true;
+      try {
+        const user = await apiCall('definirNuevaClave', window._pendingResetId, c1);
+        btn.disabled = false;
+        cerrarModalDefinirClave();
+        if (document.getElementById('login-remember').checked) {
+          localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify({ id: user.usuario, pass: c1 }));
+        }
+        currentUser = user;
+        iniciarSesionUI();
+        toast('🔐 Contraseña guardada correctamente.');
+      } catch (err) {
+        btn.disabled = false;
+        errEl.textContent = err.message;
+      }
+    }
+
+    function abrirModalCambiarClave() {
+      document.getElementById('chg-clave-act').value = '';
+      document.getElementById('chg-clave-1').value = '';
+      document.getElementById('chg-clave-2').value = '';
+      document.getElementById('chg-clave-err').textContent = '';
+      document.getElementById('modal-cambiar-clave').classList.remove('hidden');
+    }
+
+    function cerrarModalCambiarClave() {
+      document.getElementById('modal-cambiar-clave').classList.add('hidden');
+    }
+
+    async function guardarCambioMiClave() {
+      const act = document.getElementById('chg-clave-act').value.trim();
+      const c1 = document.getElementById('chg-clave-1').value.trim();
+      const c2 = document.getElementById('chg-clave-2').value.trim();
+      const errEl = document.getElementById('chg-clave-err');
+      errEl.textContent = '';
+      if (c1.length < 4) { errEl.textContent = 'La nueva contraseña debe tener al menos 4 caracteres.'; return; }
+      if (c1 !== c2) { errEl.textContent = 'Las contraseñas nuevas no coinciden.'; return; }
+
+      const btn = document.getElementById('btn-chg-clave');
+      btn.disabled = true;
+      try {
+        await apiCall('cambiarMiClave', currentUser.correo, act, c1);
+        btn.disabled = false;
+        cerrarModalCambiarClave();
+        const raw = localStorage.getItem(STORAGE_SESSION_KEY);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          saved.pass = c1;
+          localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(saved));
+        }
+        toast('🔑 Contraseña actualizada correctamente.');
+      } catch (err) {
+        btn.disabled = false;
         errEl.textContent = err.message;
       }
     }
@@ -856,10 +999,11 @@
           <tr>
             <td>${u.correo}</td><td><strong>${u.usuario}</strong></td><td>${u.nombre}</td>
             <td><span class="pill pill-blue">${u.rol}</span></td><td>${u.funciones}</td>
-            <td><span class="pill ${u.activo ? 'pill-green' : 'pill-red'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+            <td><span class="pill ${u.activo ? 'pill-green' : 'pill-red'}">${u.activo ? 'Activo' : 'Inactivo'}</span>${u.debeCambiarClave ? ' <span class="pill pill-amber">🔑 Cambio pend.</span>' : ''}</td>
             <td style="display:flex; gap:6px;">
-              <button class="btn btn-outline btn-sm" onclick='editarUsuario(${JSON.stringify(u)})'>✏️</button>
-              <button class="btn btn-outline btn-sm" style="color:var(--red); border-color:#fca5a5;" onclick="eliminarUsuarioApp('${u.correo}', '${u.usuario}')">🗑️</button>
+              <button class="btn btn-outline btn-sm" onclick='editarUsuario(${JSON.stringify(u)})' title="Editar">✏️</button>
+              <button class="btn btn-outline btn-sm" onclick="reiniciarClaveApp('${u.correo}', '${u.usuario}')" title="Solicitar reinicio de clave">🔑</button>
+              <button class="btn btn-outline btn-sm" style="color:var(--red); border-color:#fca5a5;" onclick="eliminarUsuarioApp('${u.correo}', '${u.usuario}')" title="Eliminar">🗑️</button>
             </td>
           </tr>
         `).join('');
@@ -900,9 +1044,9 @@
       const msgEl = document.getElementById('u-msg');
       const btn = document.getElementById('btn-guardar-usuario');
       msgEl.textContent = '';
-      if ((!userData.correo && !userData.usuario) || !userData.clave) {
+      if (!userData.correo && !userData.usuario) {
         msgEl.style.color = 'var(--red)';
-        msgEl.textContent = '⚠️ Debes ingresar Correo (o Usuario) y Clave.';
+        msgEl.textContent = '⚠️ Debes ingresar Correo o Usuario.';
         return;
       }
       btn.disabled = true;
@@ -921,6 +1065,17 @@
         btn.textContent = '💾 Guardar Usuario';
         msgEl.style.color = 'var(--red)';
         msgEl.textContent = '❌ ' + err.message;
+        toast('Error: ' + err.message);
+      }
+    }
+
+    async function reiniciarClaveApp(correo, usuario) {
+      if (!confirm(`¿Activar reinicio de contraseña para "${usuario}"? Al ingresar deberá crear una nueva.`)) return;
+      try {
+        await apiCall('solicitarReinicioClave', correo, currentUser.correo);
+        toast(`🔑 Reinicio activado para ${usuario}.`);
+        cargarModerador();
+      } catch (err) {
         toast('Error: ' + err.message);
       }
     }
