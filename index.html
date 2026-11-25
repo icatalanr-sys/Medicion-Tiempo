@@ -147,7 +147,7 @@
         <label for="login-remember" style="margin:0; text-transform:none; font-size:14px; font-weight:600; cursor:pointer;">Mantener sesión iniciada en este dispositivo</label>
       </div>
       <button class="btn btn-primary" style="width:100%;" id="btn-login" onclick="doLogin()">Ingresar</button>
-      <button class="btn btn-outline hidden" style="width:100%; margin-top:10px;" id="btn-install-pwa" onclick="instalarPWA()">📲 Instalar App en este dispositivo</button>
+      <button class="btn btn-outline" style="width:100%; margin-top:10px;" id="btn-install-pwa" onclick="instalarPWA()">📲 Instalar App en este dispositivo</button>
       <div id="login-error" style="color:var(--red); font-size:13px; font-weight:600; margin-top:10px; text-align:center;"></div>
     </div>
   </div>
@@ -387,7 +387,7 @@
     </main>
   </div>
 
-  <div id="badge-app-version" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.75); color:#fff; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; pointer-events:none;">v4.4</div>
+  <div id="badge-app-version" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.75); color:#fff; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; pointer-events:none;">v4.5</div>
 
   <!-- MODAL ACTUALIZACIÓN -->
   <div id="modal-actualizacion" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:300; display:flex; align-items:center; justify-content:center; padding:16px;">
@@ -468,7 +468,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '4.4';
+    const CLIENT_APP_VERSION = '4.5';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
     const STORAGE_OFFLINE_QUEUE_KEY = 'pn8000_pwa_offline_queue';
     const STORAGE_OFFLINE_CACHE_KEY = 'pn8000_pwa_offline_cache';
@@ -492,19 +492,28 @@
       navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
     }
 
+    (function checkStandaloneInstallBtn() {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      const btn = document.getElementById('btn-install-pwa');
+      if (btn && isStandalone) btn.classList.add('hidden');
+    })();
+
     window.addEventListener('beforeinstallprompt', e => {
       e.preventDefault();
       deferredPrompt = e;
-      document.getElementById('btn-install-pwa').classList.remove('hidden');
+      const btn = document.getElementById('btn-install-pwa');
+      if (btn) btn.classList.remove('hidden');
     });
 
     function instalarPWA() {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(() => {
-        deferredPrompt = null;
-        document.getElementById('btn-install-pwa').classList.add('hidden');
-      });
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(() => {
+          deferredPrompt = null;
+        });
+        return;
+      }
+      alert('Para instalar la app en la tablet/teléfono:\n\n• En Chrome / Android: toca los 3 puntos (⋮) arriba a la derecha → "Instalar aplicación" o "Agregar a la pantalla principal".\n• En iPhone / iPad (Safari): toca Compartir (□↑) → "Agregar a inicio".\n\n(Si abriste el enlace desde WhatsApp o Teams, ábrelo primero en Chrome.)');
     }
 
     async function apiCall(action, ...args) {
