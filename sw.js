@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pn8000-descarga-v4.2';
+const CACHE_NAME = 'pn8000-descarga-v4.3';
 const ASSETS = ['./', './index.html', './manifest.json?v=4', './icon-192.png?v=3', './icon-512.png?v=3'];
 
 self.addEventListener('install', event => {
@@ -17,7 +17,7 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('version.json')) return;
+  if (event.request.url.includes('version.json') || event.request.url.includes('script.google.com')) return;
   const req = event.request.mode === 'navigate'
     ? new Request(event.request.url, { cache: 'no-store' })
     : event.request;
@@ -28,6 +28,6 @@ self.addEventListener('fetch', event => {
         caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         return res;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request).then(r => r || (event.request.mode === 'navigate' ? caches.match('./index.html') : undefined)))
   );
 });
