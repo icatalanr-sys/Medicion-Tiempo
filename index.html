@@ -160,6 +160,7 @@
         <span class="badge-planta" id="lbl-planta">PN8000</span>
       </div>
       <div class="user-pill">
+        <span id="badge-conn-status" class="pill pill-green" style="font-size:11px;">🟢 En línea</span>
         <button id="btn-update-pill" class="btn btn-amber btn-sm hidden" onclick="window.location.reload()">🔔 Actualizar</button>
         <span id="lbl-user-info"></span>
         <button class="btn-logout" onclick="abrirModalCambiarClave()" title="Cambiar mi contraseña">🔑 Clave</button>
@@ -169,6 +170,7 @@
 
     <nav class="nav-tabs" id="nav-tabs">
       <button class="nav-tab active" data-tab="tiempos" onclick="switchTab('tiempos')">⏱️ Toma de Tiempos</button>
+      <button class="nav-tab" data-tab="offline" id="tab-btn-offline" onclick="switchTab('offline')">📡 Offline (<span id="badge-offline-count">0</span>)</button>
       <button class="nav-tab hidden" data-tab="moderador" id="tab-btn-moderador" onclick="switchTab('moderador')">🛡️ Moderador</button>
     </nav>
 
@@ -260,6 +262,46 @@
             <button class="btn btn-start" id="btn-iniciar" onclick="iniciarDescargaApp()">
               ▶ INICIAR TEMPORIZADOR
             </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- MODO SIN INTERNET / COLA OFFLINE -->
+      <section id="tab-offline" class="hidden">
+        <div class="card">
+          <div class="card-title">
+            <span>📡 Modo Sin Internet (Almacenamiento Local)</span>
+            <span id="off-status-pill" class="pill pill-green">🟢 Con Internet</span>
+          </div>
+          <p style="font-size:13px; color:var(--muted); margin-top:0;">
+            Cuando trabajes sin internet, los viajes descargados del Excel quedan guardados en la tablet y tus tiempos se almacenan localmente hasta que vuelvas a tener conexión para subirlos.
+          </p>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px;">
+            <div style="font-size:13px;">
+              <div><strong>Viajes en caché offline:</strong> <span id="off-cache-count">0</span></div>
+              <div style="color:var(--muted); font-size:12px;">Última sincronización: <span id="off-cache-time">Sin caché</span></div>
+            </div>
+            <label style="display:flex; align-items:center; gap:8px; margin:0; text-transform:none; font-weight:700; cursor:pointer; font-size:13px;">
+              <input type="checkbox" id="chk-forzar-offline" style="width:auto; min-height:auto;" onchange="onToggleForzarOffline()" />
+              Forzar modo Sin Internet
+            </label>
+          </div>
+          <button class="btn btn-primary" id="btn-sync-offline" onclick="sincronizarColaOffline()" style="width:100%;">
+            ☁️ Subir Registros Pendientes (<span id="off-btn-count">0</span>)
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">⏱️ En Curso Offline (<span id="off-activos-count">0</span>)</div>
+          <div id="lista-offline-activos" class="active-grid">
+            <div style="color:var(--muted); font-size:14px;">No hay operaciones en curso guardadas sin internet.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">✅ Finalizados Pendientes por Subir (<span id="off-fin-count">0</span>)</div>
+          <div id="lista-offline-finalizados" class="active-grid">
+            <div style="color:var(--muted); font-size:14px;">No hay registros finalizados pendientes de subir.</div>
           </div>
         </div>
       </section>
@@ -424,8 +466,12 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '4.2';
+    const CLIENT_APP_VERSION = '4.3';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
+    const STORAGE_OFFLINE_QUEUE_KEY = 'pn8000_pwa_offline_queue';
+    const STORAGE_OFFLINE_CACHE_KEY = 'pn8000_pwa_offline_cache';
+    const STORAGE_USER_CACHE_KEY = 'pn8000_pwa_user_cache';
+    const STORAGE_FORCE_OFFLINE_KEY = 'pn8000_pwa_force_offline';
 
     let currentUser = null;
     let appConfig = { PLANTA_OBJETIVO: 'PN8000', META_MINUTOS: 45, FILTRO_DEPOSITO: 'ORIGEN' };
@@ -515,10 +561,22 @@
         if (remember) localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify({ id: id, pass: pass }));
         else localStorage.removeItem(STORAGE_SESSION_KEY);
         currentUser = user;
+        guardarUserCacheOffline(id, user);
         iniciarSesionUI();
       } catch (err) {
         btn.disabled = false;
         btn.textContent = 'Ingresar';
+        if (esErrorDeRed(err)) {
+          const uCache = leerUserCacheOffline(id);
+          if (uCache) {
+            currentUser = uCache;
+            iniciarSesionUI();
+            toast('📡 Sin internet: ingresaste con sesión guardada.');
+            return;
+          }
+          errEl.textContent = 'Sin conexión a internet y sin sesión previa guardada en este dispositivo.';
+          return;
+        }
         localStorage.removeItem(STORAGE_SESSION_KEY);
         errEl.textContent = err.message;
       }
@@ -546,6 +604,7 @@
           localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify({ id: user.usuario, pass: c1 }));
         }
         currentUser = user;
+        guardarUserCacheOffline(id, user);
         iniciarSesionUI();
         toast('🔐 Contraseña guardada correctamente.');
       } catch (err) {
@@ -661,21 +720,154 @@
     }
 
     function switchTab(tab) {
-      ['tiempos', 'moderador'].forEach(t => {
-        document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+      ['tiempos', 'offline', 'moderador'].forEach(t => {
+        const sec = document.getElementById('tab-' + t);
+        if (sec) sec.classList.toggle('hidden', t !== tab);
         const btn = document.querySelector(`[data-tab="${t}"]`);
         if (btn) btn.classList.toggle('active', t === tab);
       });
+      if (tab === 'offline') renderOfflineTab();
       if (tab === 'moderador') cargarModerador();
     }
 
+    function esErrorDeRed(err) {
+      if (!navigator.onLine) return true;
+      const msg = String(err && err.message || err || '').toLowerCase();
+      return msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed') || msg.includes('network');
+    }
+
+    function estaModoOffline() {
+      return !navigator.onLine || localStorage.getItem(STORAGE_FORCE_OFFLINE_KEY) === '1';
+    }
+
+    function leerColaOffline() {
+      try {
+        const raw = localStorage.getItem(STORAGE_OFFLINE_QUEUE_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch (e) { return []; }
+    }
+
+    function guardarColaOffline(arr) {
+      localStorage.setItem(STORAGE_OFFLINE_QUEUE_KEY, JSON.stringify(arr || []));
+      actualizarBadgeOffline();
+    }
+
+    function guardarUserCacheOffline(id, user) {
+      try {
+        localStorage.setItem(STORAGE_USER_CACHE_KEY, JSON.stringify({ id: String(id || '').toLowerCase(), user: user }));
+      } catch (e) {}
+    }
+
+    function leerUserCacheOffline(id) {
+      try {
+        const raw = localStorage.getItem(STORAGE_USER_CACHE_KEY);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data || !data.user) return null;
+        const idNorm = String(id || '').trim().toLowerCase();
+        if (!idNorm || idNorm === data.id || idNorm === String(data.user.correo || '').toLowerCase() || idNorm === String(data.user.usuario || '').toLowerCase()) {
+          return data.user;
+        }
+        return null;
+      } catch (e) { return null; }
+    }
+
+    function actualizarEstadoConexionUI() {
+      const offline = estaModoOffline();
+      const badge = document.getElementById('badge-conn-status');
+      const pill = document.getElementById('off-status-pill');
+      if (badge) {
+        badge.className = 'pill ' + (offline ? 'pill-amber' : 'pill-green');
+        badge.textContent = offline ? '🟠 Sin Internet' : '🟢 En línea';
+      }
+      if (pill) {
+        pill.className = 'pill ' + (offline ? 'pill-amber' : 'pill-green');
+        pill.textContent = offline ? '🟠 Sin Internet (Guardando local)' : '🟢 Con Internet';
+      }
+      const chk = document.getElementById('chk-forzar-offline');
+      if (chk) chk.checked = localStorage.getItem(STORAGE_FORCE_OFFLINE_KEY) === '1';
+    }
+
+    function onToggleForzarOffline() {
+      const chk = document.getElementById('chk-forzar-offline');
+      localStorage.setItem(STORAGE_FORCE_OFFLINE_KEY, chk && chk.checked ? '1' : '0');
+      actualizarEstadoConexionUI();
+      renderOfflineTab();
+      toast(chk && chk.checked ? '🟠 Modo Sin Internet activado manualmente.' : '🟢 Modo automático restaurado.');
+    }
+
+    function actualizarBadgeOffline() {
+      const cola = leerColaOffline();
+      const n = cola.length;
+      const b1 = document.getElementById('badge-offline-count');
+      const b2 = document.getElementById('off-btn-count');
+      if (b1) b1.textContent = n;
+      if (b2) b2.textContent = n;
+    }
+
+    function combinarActivosConOffline(remotos) {
+      const cola = leerColaOffline();
+      const ahora = Date.now();
+      const offActivos = cola.filter(x => !x.clientStopMs).map(x => ({
+        idRegistro: x.offlineId,
+        elapsedMs: Math.max(0, ahora - (Number(x.clientStartMs) || ahora)),
+        horaInicioTexto: x.horaInicioTexto || '',
+        patente: x.patente,
+        eett: x.eettFinal,
+        idViaje: x.idViaje,
+        pallets: x.palletsDespachados || x.palletsPlanificados || 0,
+        tipoVehiculo: x.tipoVehiculo || '',
+        observacion: x.observacion || '',
+        tipoOperacion: x.tipoOperacion || 'CARGA',
+        esOffline: true
+      }));
+      return [...offActivos, ...(remotos || [])];
+    }
+
+    function cargarCacheOfflineEnMemoria() {
+      try {
+        const raw = localStorage.getItem(STORAGE_OFFLINE_CACHE_KEY);
+        if (!raw) return false;
+        const c = JSON.parse(raw);
+        if (c.config) appConfig = c.config;
+        if (c.eetts) eettList = c.eetts;
+        if (c.viajesLocales) viajesLocales = c.viajesLocales;
+        document.getElementById('lbl-planta').textContent = appConfig.PLANTA_OBJETIVO;
+        document.getElementById('lbl-maestra-info').textContent =
+          (viajesLocales.length || 0) + ' viajes en caché offline' +
+          (c.ultimaCarga ? ' (Carga: ' + c.ultimaCarga + ')' : '');
+        poblarSelectEett();
+        activosList = combinarActivosConOffline([]);
+        renderActivos();
+        return true;
+      } catch (e) { return false; }
+    }
+
     async function refrescarEstado() {
+      actualizarEstadoConexionUI();
+      actualizarBadgeOffline();
+      if (estaModoOffline()) {
+        const ok = cargarCacheOfflineEnMemoria();
+        if (!ok) toast('🟠 Sin internet y sin caché previa de Excel.');
+        return;
+      }
       try {
         const res = await apiCall('getEstadoInicial', currentUser.correo);
         appConfig = res.config || appConfig;
         eettList = res.eetts || [];
         viajesLocales = res.viajesLocales || [];
-        activosList = res.activos || [];
+        try {
+          localStorage.setItem(STORAGE_OFFLINE_CACHE_KEY, JSON.stringify({
+            config: appConfig,
+            eetts: eettList,
+            viajesLocales: viajesLocales,
+            totalViajesPlanta: res.totalViajesPlanta,
+            ultimaCarga: res.ultimaCarga || '',
+            savedAt: Date.now()
+          }));
+        } catch (e) {}
+        activosList = combinarActivosConOffline(res.activos || []);
         document.getElementById('lbl-planta').textContent = appConfig.PLANTA_OBJETIVO;
         document.getElementById('lbl-maestra-info').textContent =
           res.totalViajesPlanta + ' viajes ' + appConfig.PLANTA_OBJETIVO +
@@ -683,7 +875,12 @@
         poblarSelectEett();
         renderActivos();
       } catch (err) {
-        toast('Error: ' + err.message);
+        if (esErrorDeRed(err) && cargarCacheOfflineEnMemoria()) {
+          actualizarEstadoConexionUI();
+          toast('📡 Trabajando con datos locales guardados (sin internet).');
+        } else {
+          toast('Error: ' + err.message);
+        }
       }
     }
 
@@ -731,6 +928,7 @@
             <div style="font-size:13px; font-weight:600; color:var(--primary); margin-top:2px;">${a.eett}</div>
             <div class="trip-meta">
               <span class="pill ${a.tipoOperacion === 'CARGA' ? 'pill-amber' : (a.tipoOperacion === 'D+C' ? 'pill-blue' : 'pill-green')}">${a.tipoOperacion === 'CARGA' ? '📦 CARGA' : (a.tipoOperacion === 'D+C' ? '🔄 D+C' : '📥 DESCARGA')}</span>
+              ${(a.esOffline || String(a.idRegistro).startsWith('OFF-')) ? '<span class="pill pill-amber">📡 OFFLINE</span>' : ''}
               <span class="pill">🕒 Llegada: ${a.horaInicioTexto}</span>
               ${a.idViaje ? `<span class="pill pill-blue">Viaje ${a.idViaje}</span>` : `<span class="pill pill-red">MANUAL</span>`}
               <span class="pill">${a.pallets} pallets</span>
@@ -1026,6 +1224,22 @@
       };
 
       const tempId = 'TEMP-' + clientStartMs;
+      const guardarInicioOffline = () => {
+        const offlineId = 'OFF-' + clientStartMs + '-' + Math.floor(100 + Math.random() * 900);
+        const cola = leerColaOffline();
+        cola.unshift({
+          ...payload,
+          offlineId: offlineId,
+          horaInicioTexto: horaTxt,
+          clientStopMs: null,
+          duracionMin: null
+        });
+        guardarColaOffline(cola);
+        activosList = activosList.map(a => a.idRegistro === tempId ? { ...a, idRegistro: offlineId, esOffline: true } : a);
+        renderActivos();
+        renderOfflineTab();
+      };
+
       activosList.unshift({
         idRegistro: tempId,
         elapsedMs: 0,
@@ -1036,20 +1250,33 @@
         pallets: payload.palletsDespachados || payload.palletsPlanificados || 0,
         tipoVehiculo: payload.tipoVehiculo,
         observacion: payload.observacion,
-        tipoOperacion: payload.tipoOperacion
+        tipoOperacion: payload.tipoOperacion,
+        esOffline: estaModoOffline()
       });
       renderActivos();
       limpiarFormularioToma();
-      toast('⏱️ Temporizador iniciado para ' + patente);
 
+      if (estaModoOffline()) {
+        guardarInicioOffline();
+        toast('📡 Guardado sin internet para ' + patente);
+        return;
+      }
+
+      toast('⏱️ Temporizador iniciado para ' + patente);
       try {
         const res = await apiCall('iniciarDescarga', payload);
-        activosList = res.activos || [];
+        activosList = combinarActivosConOffline(res.activos || []);
         renderActivos();
       } catch (err) {
-        activosList = activosList.filter(a => a.idRegistro !== tempId);
-        renderActivos();
-        toast('Error al guardar inicio: ' + err.message);
+        if (esErrorDeRed(err)) {
+          guardarInicioOffline();
+          actualizarEstadoConexionUI();
+          toast('📡 Sin red: guardado en cola Offline para ' + patente);
+        } else {
+          activosList = activosList.filter(a => a.idRegistro !== tempId);
+          renderActivos();
+          toast('Error al guardar inicio: ' + err.message);
+        }
       }
     }
 
@@ -1070,11 +1297,29 @@
       const inp = document.getElementById('obs-live-' + idRegistro);
       const txt = inp ? inp.value.trim() : '';
       if (!txt) { toast('Escribe un comentario primero.'); return; }
+
+      if (String(idRegistro).startsWith('OFF-') || estaModoOffline()) {
+        const d = new Date();
+        const hh = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        const entrada = `[${hh} ${currentUser.usuario}] ${txt}`;
+        const cola = leerColaOffline();
+        const idx = cola.findIndex(x => x.offlineId === idRegistro);
+        if (idx >= 0) {
+          cola[idx].observacion = cola[idx].observacion ? (cola[idx].observacion + ' | ' + entrada) : entrada;
+          guardarColaOffline(cola);
+          activosList = activosList.map(a => a.idRegistro === idRegistro ? { ...a, observacion: cola[idx].observacion } : a);
+          renderActivos();
+          renderOfflineTab();
+          toast('💬 Comentario guardado offline.');
+          return;
+        }
+      }
+
       const btn = document.getElementById('btn-obs-' + idRegistro);
       if (btn) btn.disabled = true;
       try {
         const res = await apiCall('agregarComentarioActivo', idRegistro, txt, currentUser.correo);
-        activosList = res.activos || [];
+        activosList = combinarActivosConOffline(res.activos || []);
         renderActivos();
         toast('💬 Comentario agregado.');
       } catch (err) {
@@ -1089,13 +1334,31 @@
         return;
       }
       const clientStopMs = Date.now();
+
+      if (String(idRegistro).startsWith('OFF-')) {
+        const cola = leerColaOffline();
+        const idx = cola.findIndex(x => x.offlineId === idRegistro);
+        if (idx >= 0) {
+          const dFin = new Date(clientStopMs);
+          cola[idx].clientStopMs = clientStopMs;
+          cola[idx].horaFinTexto = String(dFin.getHours()).padStart(2,'0') + ':' + String(dFin.getMinutes()).padStart(2,'0') + ':' + String(dFin.getSeconds()).padStart(2,'0');
+          cola[idx].duracionMin = Math.max(0.1, Number(((clientStopMs - cola[idx].clientStartMs) / 60000).toFixed(2)));
+          guardarColaOffline(cola);
+          activosList = activosList.filter(a => a.idRegistro !== idRegistro);
+          renderActivos();
+          renderOfflineTab();
+          toast(`📡 ${patente} finalizada offline (${cola[idx].duracionMin} min). Lista para subir.`);
+          return;
+        }
+      }
+
       const backup = [...activosList];
       activosList = activosList.filter(a => a.idRegistro !== idRegistro);
       renderActivos();
 
       try {
         const res = await apiCall('finalizarDescarga', idRegistro, currentUser.correo, '', clientStopMs);
-        activosList = res.activos || activosList;
+        activosList = combinarActivosConOffline(res.activos || activosList);
         renderActivos();
         toast(`✅ ${patente} finalizada en ${res.duracionMin} min (Meta: ${res.cumpleMeta})`);
       } catch (err) {
@@ -1104,6 +1367,118 @@
         toast('Error al finalizar: ' + err.message);
       }
     }
+
+    function renderOfflineTab() {
+      actualizarEstadoConexionUI();
+      actualizarBadgeOffline();
+      try {
+        const raw = localStorage.getItem(STORAGE_OFFLINE_CACHE_KEY);
+        const c = raw ? JSON.parse(raw) : null;
+        document.getElementById('off-cache-count').textContent = c && c.viajesLocales ? c.viajesLocales.length : 0;
+        document.getElementById('off-cache-time').textContent = c && c.savedAt ? new Date(c.savedAt).toLocaleString() : 'Sin caché';
+      } catch (e) {}
+
+      const cola = leerColaOffline();
+      const activosOff = cola.filter(x => !x.clientStopMs);
+      const finOff = cola.filter(x => !!x.clientStopMs);
+      document.getElementById('off-activos-count').textContent = activosOff.length;
+      document.getElementById('off-fin-count').textContent = finOff.length;
+
+      const btnSync = document.getElementById('btn-sync-offline');
+      if (btnSync) btnSync.disabled = cola.length === 0;
+
+      const wrapAct = document.getElementById('lista-offline-activos');
+      wrapAct.innerHTML = activosOff.length ? activosOff.map(x => `
+        <div class="truck-card">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong style="font-size:18px;">${x.patente}</strong>
+              <span class="pill pill-amber">EN CURSO OFFLINE</span>
+            </div>
+            <div style="font-size:13px; color:var(--primary); font-weight:600; margin-top:2px;">${x.eettFinal}</div>
+            <div class="trip-meta">
+              <span class="pill ${x.tipoOperacion === 'CARGA' ? 'pill-amber' : (x.tipoOperacion === 'D+C' ? 'pill-blue' : 'pill-green')}">${x.tipoOperacion}</span>
+              <span class="pill">🕒 Inicio: ${x.horaInicioTexto || ''}</span>
+              ${x.idViaje ? `<span class="pill pill-blue">Viaje ${x.idViaje}</span>` : `<span class="pill pill-red">MANUAL</span>`}
+              <span class="pill">${x.palletsDespachados || x.palletsPlanificados || 0} pal</span>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-stop" style="flex:1;" onclick="finalizarDescargaApp('${x.offlineId}', '${x.patente}')">⏹ FINALIZAR</button>
+            <button class="btn btn-outline btn-sm" onclick="eliminarRegistroOffline('${x.offlineId}')" title="Descartar">🗑️</button>
+          </div>
+        </div>
+      `).join('') : '<div style="color:var(--muted); font-size:14px;">No hay operaciones en curso guardadas sin internet.</div>';
+
+      const wrapFin = document.getElementById('lista-offline-finalizados');
+      wrapFin.innerHTML = finOff.length ? finOff.map(x => `
+        <div class="truck-card" style="border-left-color:var(--blue);">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong style="font-size:18px;">${x.patente}</strong>
+              <span class="pill pill-green">${x.duracionMin} min</span>
+            </div>
+            <div style="font-size:13px; color:var(--primary); font-weight:600; margin-top:2px;">${x.eettFinal}</div>
+            <div class="trip-meta">
+              <span class="pill ${x.tipoOperacion === 'CARGA' ? 'pill-amber' : (x.tipoOperacion === 'D+C' ? 'pill-blue' : 'pill-green')}">${x.tipoOperacion}</span>
+              <span class="pill">🕒 ${x.horaInicioTexto || ''} → ${x.horaFinTexto || ''}</span>
+              ${x.idViaje ? `<span class="pill pill-blue">Viaje ${x.idViaje}</span>` : `<span class="pill pill-red">MANUAL</span>`}
+              <span class="pill">${x.palletsDespachados || x.palletsPlanificados || 0} pal</span>
+            </div>
+            ${x.observacion ? `<div style="margin-top:6px; font-size:12px; color:var(--muted);">💬 ${x.observacion}</div>` : ''}
+          </div>
+          <button class="btn btn-outline btn-sm" style="color:var(--red); border-color:#fca5a5;" onclick="eliminarRegistroOffline('${x.offlineId}')">🗑️ Eliminar local</button>
+        </div>
+      `).join('') : '<div style="color:var(--muted); font-size:14px;">No hay registros finalizados pendientes de subir.</div>';
+    }
+
+    function eliminarRegistroOffline(offlineId) {
+      if (!confirm('¿Eliminar este registro guardado localmente antes de subirlo?')) return;
+      const cola = leerColaOffline().filter(x => x.offlineId !== offlineId);
+      guardarColaOffline(cola);
+      activosList = activosList.filter(a => a.idRegistro !== offlineId);
+      renderActivos();
+      renderOfflineTab();
+      toast('🗑️ Registro offline eliminado.');
+    }
+
+    async function sincronizarColaOffline() {
+      const cola = leerColaOffline();
+      if (cola.length === 0) { toast('No hay registros pendientes por subir.'); return; }
+      if (estaModoOffline()) {
+        toast('🟠 Aún estás en modo Sin Internet. Conéctate a la red o desactiva el modo forzado.');
+        return;
+      }
+      const btn = document.getElementById('btn-sync-offline');
+      btn.disabled = true;
+      btn.textContent = '⏳ Subiendo a Google Sheets...';
+      try {
+        const res = await apiCall('sincronizarLoteOffline', cola, currentUser.correo);
+        guardarColaOffline([]);
+        activosList = combinarActivosConOffline(res.activos || []);
+        renderActivos();
+        renderOfflineTab();
+        toast(`☁️ ¡Listo! ${res.subidos} registro(s) subido(s) correctamente.`);
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `☁️ Subir Registros Pendientes (<span id="off-btn-count">${cola.length}</span>)`;
+        toast('Error al subir: ' + err.message);
+      }
+    }
+
+    window.addEventListener('online', () => {
+      actualizarEstadoConexionUI();
+      const n = leerColaOffline().length;
+      if (n > 0) {
+        toast(`🌐 ¡Conexión recuperada! Tienes ${n} registro(s) listos para subir en 📡 Offline.`);
+      } else {
+        toast('🌐 Conexión a internet recuperada.');
+      }
+    });
+    window.addEventListener('offline', () => {
+      actualizarEstadoConexionUI();
+      toast('📡 Sin internet: la app guardará tus registros localmente.');
+    });
 
     async function cargarModerador() {
       try {
