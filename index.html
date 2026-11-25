@@ -355,7 +355,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '3.5';
+    const CLIENT_APP_VERSION = '3.6';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
 
     let currentUser = null;
@@ -736,6 +736,9 @@
       if (!eettFinal) { toast('Selecciona o digita la Empresa de Transporte.'); return; }
 
       const v = selectedTrip || {};
+      const clientStartMs = Date.now();
+      const dAhora = new Date(clientStartMs);
+      const horaTxt = String(dAhora.getHours()).padStart(2,'0') + ':' + String(dAhora.getMinutes()).padStart(2,'0') + ':' + String(dAhora.getSeconds()).padStart(2,'0');
       const payload = {
         usuarioCorreo: currentUser.correo,
         patente: patente,
@@ -756,24 +759,35 @@
         estadoExcel: v.estado || '',
         anden: '',
         observacion: document.getElementById('inp-obs').value.trim(),
-        tipoOperacion: document.getElementById('sel-operacion').value
+        tipoOperacion: document.getElementById('sel-operacion').value,
+        clientStartMs: clientStartMs
       };
 
-      const btn = document.getElementById('btn-iniciar');
-      btn.disabled = true;
-      btn.textContent = '⏳ Iniciando...';
+      const tempId = 'TEMP-' + clientStartMs;
+      activosList.unshift({
+        idRegistro: tempId,
+        elapsedMs: 0,
+        horaInicioTexto: horaTxt,
+        patente: patente,
+        eett: eettFinal,
+        idViaje: payload.idViaje,
+        pallets: payload.palletsDespachados || payload.palletsPlanificados || 0,
+        tipoVehiculo: payload.tipoVehiculo,
+        observacion: payload.observacion,
+        tipoOperacion: payload.tipoOperacion
+      });
+      renderActivos();
+      limpiarFormularioToma();
+      toast('⏱️ Temporizador iniciado para ' + patente);
+
       try {
         const res = await apiCall('iniciarDescarga', payload);
-        btn.disabled = false;
-        btn.textContent = '▶ INICIAR TEMPORIZADOR';
         activosList = res.activos || [];
         renderActivos();
-        limpiarFormularioToma();
-        toast('⏱️ Descarga iniciada para ' + patente);
       } catch (err) {
-        btn.disabled = false;
-        btn.textContent = '▶ INICIAR TEMPORIZADOR';
-        toast('Error: ' + err.message);
+        activosList = activosList.filter(a => a.idRegistro !== tempId);
+        renderActivos();
+        toast('Error al guardar inicio: ' + err.message);
       }
     }
 
@@ -806,14 +820,24 @@
     }
 
     async function finalizarDescargaApp(idRegistro, patente) {
-      if (!confirm(`¿Confirmar término de descarga para ${patente}?`)) return;
+      if (String(idRegistro).startsWith('TEMP-')) {
+        toast('Sincronizando inicio, intenta en 1 segundo...');
+        return;
+      }
+      const clientStopMs = Date.now();
+      const backup = [...activosList];
+      activosList = activosList.filter(a => a.idRegistro !== idRegistro);
+      renderActivos();
+
       try {
-        const res = await apiCall('finalizarDescarga', idRegistro, currentUser.correo, '');
-        activosList = res.activos || [];
+        const res = await apiCall('finalizarDescarga', idRegistro, currentUser.correo, '', clientStopMs);
+        activosList = res.activos || activosList;
         renderActivos();
         toast(`✅ ${patente} finalizada en ${res.duracionMin} min (Meta: ${res.cumpleMeta})`);
       } catch (err) {
-        toast('Error: ' + err.message);
+        activosList = backup;
+        renderActivos();
+        toast('Error al finalizar: ' + err.message);
       }
     }
 
