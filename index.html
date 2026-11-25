@@ -193,8 +193,8 @@
 
           <div class="grid-2" style="align-items:end; margin-bottom:12px;">
             <div>
-              <label>1. Patente del Tracto (Vehículo Secundario)</label>
-              <input type="text" id="inp-patente" class="input-patente" placeholder="EJ: KRPC72" onkeydown="if(event.key==='Enter') buscarPorPatente()" />
+              <label>1. Patente (Tracto) o ID de Viaje</label>
+              <input type="text" id="inp-patente" class="input-patente" placeholder="EJ: TVHZ13 o 743416" onkeydown="if(event.key==='Enter') buscarPorPatente()" />
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="btn btn-primary" id="btn-buscar-patente" style="flex:1;" onclick="buscarPorPatente()">🔍 Buscar en Excel</button>
@@ -416,7 +416,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '3.7';
+    const CLIENT_APP_VERSION = '3.8';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
 
     let currentUser = null;
@@ -812,12 +812,13 @@
 
       if (!incluirOtros && viajesLocales.length > 0) {
         const localMatches = viajesLocales.map(v => {
+          const idN = String(v.idViaje || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
           const v1 = String(v.vehiculo || '').replace(/[^A-Z0-9]/g, '');
           const v2 = String(v.vehiculoSecundario || '').replace(/[^A-Z0-9]/g, '');
           const com = String(v.comentario || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
           let prio = 99;
-          if (v2 === pNorm) prio = 0;
-          else if (v2.includes(pNorm)) prio = 2;
+          if (idN === pNorm || v2 === pNorm) prio = 0;
+          else if (idN.includes(pNorm) || v2.includes(pNorm)) prio = 2;
           else if (v1 === pNorm || v1.includes(pNorm)) prio = 5;
           else if (com.includes(pNorm)) prio = 10;
           return prio < 99 ? { v, prio } : null;
@@ -872,13 +873,16 @@
     }
 
     async function iniciarDescargaApp() {
-      const patente = document.getElementById('inp-patente').value.trim().toUpperCase();
+      const textoBuscado = document.getElementById('inp-patente').value.trim().toUpperCase();
+      const v = selectedTrip || {};
+      const patente = (!modoManualActivo && (v.vehiculoSecundario || v.vehiculo))
+        ? (v.vehiculoSecundario || v.vehiculo)
+        : textoBuscado;
       let eettFinal = document.getElementById('sel-eett').value;
       if (eettFinal === '__OTRA__') eettFinal = document.getElementById('inp-eett-manual').value.trim();
-      if (!patente) { toast('Ingresa la patente.'); return; }
+      if (!patente) { toast('Ingresa la patente o ID de viaje.'); return; }
       if (!eettFinal) { toast('Selecciona o digita la Empresa de Transporte.'); return; }
 
-      const v = selectedTrip || {};
       const clientStartMs = Date.now();
       const dAhora = new Date(clientStartMs);
       const horaTxt = String(dAhora.getHours()).padStart(2,'0') + ':' + String(dAhora.getMinutes()).padStart(2,'0') + ':' + String(dAhora.getSeconds()).padStart(2,'0');
