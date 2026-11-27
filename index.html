@@ -499,7 +499,7 @@
     </div>
   </div>
 
-  <button type="button" id="badge-app-version" onclick="abrirModalNovedades()" title="Ver notas de actualización" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.82); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.2);">🆕 v4.11 · Novedades</button>
+  <button type="button" id="badge-app-version" onclick="abrirModalNovedades()" title="Ver notas de actualización" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.82); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.2);">🆕 v4.12 · Novedades</button>
 
   <!-- MODAL NOVEDADES / ACTUALIZACIONES -->
   <div id="modal-novedades" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:320; display:flex; align-items:center; justify-content:center; padding:16px;" onclick="if(event.target===this) cerrarModalNovedades()">
@@ -591,7 +591,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '4.11';
+    const CLIENT_APP_VERSION = '4.12';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
     const STORAGE_OFFLINE_QUEUE_KEY = 'pn8000_pwa_offline_queue';
     const STORAGE_OFFLINE_CACHE_KEY = 'pn8000_pwa_offline_cache';
@@ -1273,14 +1273,50 @@
           ctx.fillStyle = '#4ade80';
           ctx.font = 'bold 42px monospace';
           ctx.fillText(txt, 16, 118);
+          ctx.fillStyle = '#dc2626';
+          ctx.fillRect(182, 82, 122, 42);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 13px sans-serif';
+          ctx.fillText('⏸ = DETENER', 196, 108);
         };
         dibujar();
         if (pipCanvasInterval) clearInterval(pipCanvasInterval);
         pipCanvasInterval = setInterval(dibujar, 1000);
-        video.srcObject = canvas.captureStream(2);
+        const stream = canvas.captureStream(2);
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            const actx = new AudioCtx();
+            const osc = actx.createOscillator();
+            const gain = actx.createGain();
+            gain.gain.value = 0.0001;
+            const dest = actx.createMediaStreamDestination();
+            osc.connect(gain);
+            gain.connect(dest);
+            osc.start();
+            dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+          }
+        } catch (e) {}
+        video.srcObject = stream;
         await video.play();
+        if ('mediaSession' in navigator) {
+          try {
+            navigator.mediaSession.metadata = new MediaMetadata({
+              title: '🚛 ' + a.patente,
+              artist: a.eett || 'En medición',
+              album: 'PN8000'
+            });
+            navigator.mediaSession.playbackState = 'playing';
+            navigator.mediaSession.setActionHandler('pause', () => {
+              if (miniWidgetId) pararDesdeMiniWidget();
+            });
+            navigator.mediaSession.setActionHandler('stop', () => {
+              if (miniWidgetId) pararDesdeMiniWidget();
+            });
+          } catch (e) {}
+        }
         await video.requestPictureInPicture();
-        toast('📺 Ventana flotante activa. Toca la ventana para volver y parar.');
+        toast('📺 Ventana flotante activa: toca el widget y presiona ⏸ para detener.');
       } catch (err) {
         toast('Tu navegador no permite PiP externo; usa el mini widget dentro de la app o Pantalla Dividida de la tablet.');
       }
