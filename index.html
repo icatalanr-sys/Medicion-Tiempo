@@ -274,22 +274,39 @@
             <span>📝 Registro Manual con Hora de Inicio y Término</span>
             <span id="man-duracion-preview" class="pill pill-blue">Duración: -- min</span>
           </div>
-          <p style="font-size:13px; color:var(--muted); margin-top:0;">
-            Ingresa la patente y digita manualmente la hora de inicio y término. Opcionalmente puedes buscar en el Excel para autocompletar la empresa y pallets.
-          </p>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px;">
+            <button type="button" class="btn btn-primary" id="man-btn-modo-carga" onclick="cambiarModoManual('CARGA')">📦 CARGA (Hoy)</button>
+            <button type="button" class="btn btn-outline" id="man-btn-modo-descarga" onclick="cambiarModoManual('DESCARGA')">📥 DESCARGA (ID Viaje)</button>
+            <button type="button" class="btn btn-outline" id="man-btn-modo-dc" onclick="cambiarModoManual('D+C')">🔄 D+C (Unión)</button>
+          </div>
 
           <div class="grid-2" style="align-items:end; margin-bottom:12px;">
             <div>
-              <label>Patente del Tracto (o ID de Viaje) *</label>
+              <label id="man-lbl-busqueda-input">1. Patente del Tracto (o ID de Viaje) — Jornada Hoy</label>
               <input type="text" id="man-patente" class="input-patente" placeholder="EJ: TVHZ13" onkeydown="if(event.key==='Enter') buscarManualEnExcel()" />
             </div>
-            <div style="display:flex; gap:8px;">
-              <button type="button" class="btn btn-outline" style="flex:1;" onclick="buscarManualEnExcel()">🔍 Buscar en Excel</button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary" id="man-btn-buscar" style="flex:1;" onclick="buscarManualEnExcel()">🔍 Buscar en Excel</button>
+              <button type="button" class="btn btn-outline" onclick="activarSinExcelManual()">✍️ Manual</button>
               <button type="button" class="btn btn-outline" onclick="limpiarFormManual()">🧹 Limpiar</button>
             </div>
           </div>
 
-          <div id="man-excel-info" class="hidden" style="margin-bottom:12px; padding:10px 12px; border-radius:10px; background:#eff6ff; border:1px solid #93c5fd; font-size:13px; color:#1e40af;"></div>
+          <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px; font-size:13px;">
+            <input type="checkbox" id="man-chk-todos-dep" style="width:auto;" />
+            <label for="man-chk-todos-dep" style="margin:0; text-transform:none; font-weight:500;">Incluir viajes donde PN8000 no es Depósito Origen</label>
+          </div>
+
+          <div id="man-box-resultados-viajes" class="hidden" style="margin-bottom:14px;">
+            <div id="man-banner-auto-dc" class="hidden" style="margin-bottom:10px; padding:10px 12px; border-radius:10px; background:#eff6ff; border:1.5px solid #3b82f6; color:#1e40af; font-size:13px;"></div>
+            <label id="man-lbl-resultados-titulo">Selecciona el viaje correspondiente:</label>
+            <div id="man-lista-viajes-encontrados"></div>
+          </div>
+
+          <div id="man-box-alerta-manual" class="alert-box alert-danger hidden">
+            <strong>⚠️ Patente no encontrada en el Excel:</strong> Estás en modo <strong>Digitación Manual</strong>. Este registro generará una alerta en el Dashboard principal.
+          </div>
 
           <div class="grid-3" style="margin-bottom:12px;">
             <div>
@@ -308,7 +325,7 @@
 
           <div class="grid-3" style="margin-bottom:12px;">
             <div>
-              <label>Empresa de Transporte (EETT) *</label>
+              <label>2. Empresa de Transporte (EETT) *</label>
               <select id="man-eett" onchange="onChangeManEett()">
                 <option value="">-- Seleccionar EETT --</option>
               </select>
@@ -318,7 +335,7 @@
               <input type="text" id="man-eett-manual" placeholder="Nombre empresa de transporte" />
             </div>
             <div>
-              <label>Tipo de Operación *</label>
+              <label>3. Tipo de Operación *</label>
               <select id="man-operacion">
                 <option value="CARGA">📦 CARGA</option>
                 <option value="DESCARGA">📥 DESCARGA</option>
@@ -332,8 +349,8 @@
           </div>
 
           <div style="margin-bottom:14px;">
-            <label>Observación (Opcional)</label>
-            <input type="text" id="man-obs" placeholder="Motivo del ingreso manual o comentarios..." />
+            <label>4. Observación (Opcional)</label>
+            <input type="text" id="man-obs" placeholder="Comentarios adicionales (opcional)" />
           </div>
 
           <button type="button" class="btn btn-start" id="btn-guardar-manual" onclick="guardarTiempoManualApp()">
@@ -463,7 +480,7 @@
     </main>
   </div>
 
-  <div id="badge-app-version" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.75); color:#fff; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; pointer-events:none;">v4.7</div>
+  <div id="badge-app-version" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.75); color:#fff; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; pointer-events:none;">v4.8</div>
 
   <!-- MODAL ACTUALIZACIÓN -->
   <div id="modal-actualizacion" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:300; display:flex; align-items:center; justify-content:center; padding:16px;">
@@ -544,7 +561,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '4.7';
+    const CLIENT_APP_VERSION = '4.8';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
     const STORAGE_OFFLINE_QUEUE_KEY = 'pn8000_pwa_offline_queue';
     const STORAGE_OFFLINE_CACHE_KEY = 'pn8000_pwa_offline_cache';
@@ -1598,6 +1615,8 @@
 
     // ==================== REGISTRO MANUAL (HORA INICIO / TÉRMINO) ====================
     let manualMatchedTrip = null;
+    let modoManualOperacion = 'CARGA';
+    let manualSinExcelActivo = false;
 
     function inicializarFormManual() {
       const f = document.getElementById('man-fecha');
@@ -1607,6 +1626,25 @@
       }
       poblarSelectManEett();
       actualizarPreviewDuracionManual();
+    }
+
+    function cambiarModoManual(modo) {
+      modoManualOperacion = (modo === 'DESCARGA' || modo === 'D+C') ? modo : 'CARGA';
+      document.getElementById('man-btn-modo-carga').className = modoManualOperacion === 'CARGA' ? 'btn btn-primary' : 'btn btn-outline';
+      document.getElementById('man-btn-modo-descarga').className = modoManualOperacion === 'DESCARGA' ? 'btn btn-primary' : 'btn btn-outline';
+      document.getElementById('man-btn-modo-dc').className = modoManualOperacion === 'D+C' ? 'btn btn-primary' : 'btn btn-outline';
+      if (modoManualOperacion === 'CARGA') {
+        document.getElementById('man-lbl-busqueda-input').textContent = '1. Patente del Tracto (o ID de Viaje) — Jornada Hoy';
+        document.getElementById('man-patente').placeholder = 'EJ: TVHZ13';
+      } else if (modoManualOperacion === 'DESCARGA') {
+        document.getElementById('man-lbl-busqueda-input').textContent = '1. ID de Viaje (o Patente) — Todas las jornadas';
+        document.getElementById('man-patente').placeholder = 'EJ: 743416';
+      } else {
+        document.getElementById('man-lbl-busqueda-input').textContent = '1. Patente o ID de Viaje — Unión Descarga + Carga (PN8000)';
+        document.getElementById('man-patente').placeholder = 'EJ: TVHZ13 o 743416';
+      }
+      document.getElementById('man-operacion').value = modoManualOperacion;
+      limpiarFormManual();
     }
 
     function poblarSelectManEett(valorSeleccionado) {
@@ -1658,50 +1696,169 @@
       pill.textContent = `Duración: ${mins} min`;
     }
 
-    function buscarManualEnExcel() {
-      const pat = document.getElementById('man-patente').value.trim().toUpperCase();
-      if (pat.length < 4) { toast('Ingresa al menos 4 caracteres para buscar.'); return; }
-      const pNorm = pat.replace(/[^A-Z0-9]/g, '');
-      const matches = viajesLocales.filter(v => {
-        const idN = String(v.idViaje || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-        const v1 = String(v.vehiculo || '').replace(/[^A-Z0-9]/g, '');
-        const v2 = String(v.vehiculoSecundario || '').replace(/[^A-Z0-9]/g, '');
-        return idN === pNorm || v2 === pNorm || v1 === pNorm || v2.includes(pNorm) || idN.includes(pNorm);
-      });
-      const infoEl = document.getElementById('man-excel-info');
-      if (matches.length === 0) {
-        manualMatchedTrip = null;
-        infoEl.classList.add('hidden');
-        toast('No se encontró en Excel; puedes digitar los datos manualmente.');
+    function cambiarManualADCyBuscar(pat) {
+      cambiarModoManual('D+C');
+      document.getElementById('man-patente').value = pat;
+      buscarManualEnExcel();
+    }
+
+    function activarSinExcelManual() {
+      manualSinExcelActivo = true;
+      manualMatchedTrip = null;
+      document.getElementById('man-box-resultados-viajes').classList.add('hidden');
+      const bDc = document.getElementById('man-banner-auto-dc');
+      if (bDc) { bDc.classList.add('hidden'); bDc.innerHTML = ''; }
+      document.getElementById('man-box-alerta-manual').classList.remove('hidden');
+      document.getElementById('man-operacion').value = modoManualOperacion;
+      poblarSelectManEett('');
+    }
+
+    function mostrarResultadosManual(viajes, pat) {
+      if (!viajes || viajes.length === 0) {
+        activarSinExcelManual();
         return;
       }
-      const v = matches[0];
-      manualMatchedTrip = v;
-      if (v.vehiculoSecundario || v.vehiculo) {
-        document.getElementById('man-patente').value = v.vehiculoSecundario || v.vehiculo;
+      manualSinExcelActivo = false;
+      document.getElementById('man-box-alerta-manual').classList.add('hidden');
+      document.getElementById('man-box-resultados-viajes').classList.remove('hidden');
+
+      const bannerDc = document.getElementById('man-banner-auto-dc');
+      if (bannerDc) {
+        const patKey = String(viajes[0].vehiculoSecundario || viajes[0].vehiculo || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const dcPairs = (modoManualOperacion !== 'D+C' && patKey && viajesLocales.length > 0) ? emparejarViajesDC(viajesLocales, patKey) : [];
+        if (dcPairs.length > 0) {
+          bannerDc.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;"><span>🔄 <strong>Unión de Flujo detectada (D+C):</strong> La patente <strong>${patKey}</strong> tiene viaje de DESCARGA + CARGA en PN8000.</span><button type="button" class="btn btn-primary btn-sm" onclick="cambiarManualADCyBuscar('${String(pat || '').replace(/'/g, "\\'")}')">Cambiar a 🔄 D+C</button></div>`;
+          bannerDc.classList.remove('hidden');
+        } else {
+          bannerDc.classList.add('hidden');
+          bannerDc.innerHTML = '';
+        }
       }
+
+      document.getElementById('man-lbl-resultados-titulo').textContent =
+        viajes.length > 1
+          ? `Se encontraron ${viajes.length} viajes para ${pat}. Elige cuál estás registrando:`
+          : `Viaje encontrado para ${pat}:`;
+
+      document.getElementById('man-lista-viajes-encontrados').innerHTML = viajes.map((v, idx) => `
+        <div class="trip-option ${idx === 0 ? 'selected' : ''}" onclick="seleccionarViajeManual(${idx})" id="man-trip-opt-${idx}">
+          <div style="display:flex; justify-content:space-between; font-weight:700; flex-wrap:wrap; gap:6px;">
+            <span>Tracto: ${v.vehiculoSecundario || v.vehiculo} — ${v.eett}</span>
+            <span class="pill ${v.tipoOperacion === 'CARGA' ? 'pill-amber' : (v.tipoOperacion === 'D+C' ? 'pill-blue' : 'pill-green')}">${v.tipoOperacion === 'CARGA' ? '📦 CARGA' : (v.tipoOperacion === 'D+C' ? '🔄 D+C' : '📥 DESCARGA')}</span>
+          </div>
+          ${v.detalleDC ? `<div style="font-size:12px; color:#1e40af; margin-top:6px; font-weight:600;">🔄 ${v.detalleDC}</div>` : ''}
+          <div class="trip-meta">
+            <span class="pill pill-blue">Viaje ${v.idViaje}</span>
+            <span class="pill">${v.depositoOrigen} → ${v.depositoDestino}</span>
+            <span class="pill">${v.palletsDespachados || v.palletsPlanificados} pallets</span>
+            <span class="pill">${v.tipoVehiculo}</span>
+            ${v.vehiculo ? `<span class="pill">Rampla: ${v.vehiculo}</span>` : ''}
+            <span class="pill">Jornada: ${v.jornada}</span>
+          </div>
+        </div>
+      `).join('');
+
+      window._viajesManualEncontrados = viajes;
+      seleccionarViajeManual(0);
+    }
+
+    function seleccionarViajeManual(idx) {
+      const v = (window._viajesManualEncontrados || [])[idx];
+      if (!v) return;
+      manualMatchedTrip = v;
+      document.querySelectorAll('#man-lista-viajes-encontrados .trip-option').forEach((el, i) => el.classList.toggle('selected', i === idx));
       poblarSelectManEett(v.eett);
-      document.getElementById('man-operacion').value = v.tipoOperacion || 'CARGA';
+      document.getElementById('man-operacion').value = v.tipoOperacion || modoManualOperacion;
       document.getElementById('man-pallets').value = v.palletsDespachados || v.palletsPlanificados || 0;
-      infoEl.innerHTML = `✅ <strong>Excel encontrado:</strong> Viaje <strong>${v.idViaje}</strong> · ${v.depositoOrigen} → ${v.depositoDestino} · ${v.eett} (${v.palletsDespachados || v.palletsPlanificados || 0} pal)`;
-      infoEl.classList.remove('hidden');
+      document.getElementById('man-obs').value = v.comentario || '';
+    }
+
+    async function buscarManualEnExcel() {
+      const pat = document.getElementById('man-patente').value.trim().toUpperCase();
+      if (pat.length < 4) { toast('Ingresa al menos 4 caracteres de la patente.'); return; }
+      const pNorm = pat.replace(/[^A-Z0-9]/g, '');
+      const incluirOtros = document.getElementById('man-chk-todos-dep').checked;
+
+      manualMatchedTrip = null;
+      window._viajesManualEncontrados = [];
+      manualSinExcelActivo = false;
+      document.getElementById('man-box-resultados-viajes').classList.add('hidden');
+      document.getElementById('man-lista-viajes-encontrados').innerHTML = '';
+      document.getElementById('man-box-alerta-manual').classList.add('hidden');
+
+      if (!incluirOtros && viajesLocales.length > 0) {
+        if (modoManualOperacion === 'D+C') {
+          mostrarResultadosManual(emparejarViajesDC(viajesLocales, pNorm), pat);
+          return;
+        }
+        const localMatches = viajesLocales
+          .filter(v => v.tipoOperacion === modoManualOperacion)
+          .map(v => {
+            const idN = String(v.idViaje || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            const v1 = String(v.vehiculo || '').replace(/[^A-Z0-9]/g, '');
+            const v2 = String(v.vehiculoSecundario || '').replace(/[^A-Z0-9]/g, '');
+            const com = String(v.comentario || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            let prio = 99;
+            if (modoManualOperacion === 'DESCARGA') {
+              if (idN === pNorm) prio = 0;
+              else if (idN.includes(pNorm)) prio = 1;
+              else if (v2 === pNorm) prio = 2;
+              else if (v2.includes(pNorm)) prio = 3;
+              else if (v1 === pNorm || v1.includes(pNorm)) prio = 5;
+              else if (com.includes(pNorm)) prio = 10;
+            } else {
+              if (v2 === pNorm || idN === pNorm) prio = 0;
+              else if (v2.includes(pNorm) || idN.includes(pNorm)) prio = 2;
+              else if (v1 === pNorm || v1.includes(pNorm)) prio = 5;
+              else if (com.includes(pNorm)) prio = 10;
+            }
+            return prio < 99 ? { v, prio } : null;
+          }).filter(Boolean).sort((a, b) => a.prio - b.prio).map(x => x.v);
+        mostrarResultadosManual(localMatches, pat);
+        return;
+      }
+
+      const btn = document.getElementById('man-btn-buscar');
+      btn.disabled = true;
+      btn.textContent = '⏳ Buscando...';
+      try {
+        const res = await apiCall('buscarPatente', pat, currentUser.correo, incluirOtros, modoManualOperacion);
+        btn.disabled = false;
+        btn.textContent = '🔍 Buscar en Excel';
+        if (res.eetts && res.eetts.length) eettList = res.eetts;
+        mostrarResultadosManual(res.viajes || [], pat);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '🔍 Buscar en Excel';
+        toast('Error al buscar: ' + err.message);
+      }
     }
 
     function limpiarFormManual() {
       manualMatchedTrip = null;
+      manualSinExcelActivo = false;
+      window._viajesManualEncontrados = [];
       document.getElementById('man-patente').value = '';
       document.getElementById('man-hora-inicio').value = '';
       document.getElementById('man-hora-fin').value = '';
       document.getElementById('man-eett-manual').value = '';
       document.getElementById('man-pallets').value = '0';
       document.getElementById('man-obs').value = '';
-      document.getElementById('man-excel-info').classList.add('hidden');
+      document.getElementById('man-box-resultados-viajes').classList.add('hidden');
+      const bDc = document.getElementById('man-banner-auto-dc');
+      if (bDc) { bDc.classList.add('hidden'); bDc.innerHTML = ''; }
+      document.getElementById('man-box-alerta-manual').classList.add('hidden');
+      document.getElementById('man-operacion').value = modoManualOperacion;
       poblarSelectManEett('');
       actualizarPreviewDuracionManual();
     }
 
     async function guardarTiempoManualApp() {
-      const patente = document.getElementById('man-patente').value.trim().toUpperCase();
+      const textoBuscado = document.getElementById('man-patente').value.trim().toUpperCase();
+      const v = manualMatchedTrip || {};
+      const patente = (!manualSinExcelActivo && (v.vehiculoSecundario || v.vehiculo))
+        ? (v.vehiculoSecundario || v.vehiculo)
+        : textoBuscado;
       const fecha = document.getElementById('man-fecha').value;
       const horaInicio = document.getElementById('man-hora-inicio').value;
       const horaFin = document.getElementById('man-hora-fin').value;
@@ -1711,7 +1868,7 @@
       const pallets = Number(document.getElementById('man-pallets').value) || 0;
       const observacion = document.getElementById('man-obs').value.trim();
 
-      if (!patente) { toast('Ingresa la patente.'); return; }
+      if (!patente) { toast('Ingresa la patente o ID de viaje.'); return; }
       if (!fecha || !horaInicio || !horaFin) { toast('Completa fecha, hora de inicio y hora de término.'); return; }
       if (!eettFinal) { toast('Selecciona o digita la Empresa de Transporte.'); return; }
 
@@ -1725,7 +1882,6 @@
         return;
       }
 
-      const v = manualMatchedTrip || {};
       const payload = {
         usuarioCorreo: currentUser.correo,
         patente: patente,
