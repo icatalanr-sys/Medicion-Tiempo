@@ -170,6 +170,7 @@
 
     <nav class="nav-tabs" id="nav-tabs">
       <button class="nav-tab active" data-tab="tiempos" onclick="switchTab('tiempos')">⏱️ Toma de Tiempos</button>
+      <button class="nav-tab" data-tab="manual" id="tab-btn-manual" onclick="switchTab('manual')">📝 Registro Manual</button>
       <button class="nav-tab" data-tab="offline" id="tab-btn-offline" onclick="switchTab('offline')">📡 Offline (<span id="badge-offline-count">0</span>)</button>
       <button class="nav-tab hidden" data-tab="moderador" id="tab-btn-moderador" onclick="switchTab('moderador')">🛡️ Moderador</button>
     </nav>
@@ -263,6 +264,81 @@
               ▶ INICIAR TEMPORIZADOR
             </button>
           </div>
+        </div>
+      </section>
+
+      <!-- REGISTRO MANUAL (HORA INICIO / TÉRMINO) -->
+      <section id="tab-manual" class="hidden">
+        <div class="card">
+          <div class="card-title">
+            <span>📝 Registro Manual con Hora de Inicio y Término</span>
+            <span id="man-duracion-preview" class="pill pill-blue">Duración: -- min</span>
+          </div>
+          <p style="font-size:13px; color:var(--muted); margin-top:0;">
+            Ingresa la patente y digita manualmente la hora de inicio y término. Opcionalmente puedes buscar en el Excel para autocompletar la empresa y pallets.
+          </p>
+
+          <div class="grid-2" style="align-items:end; margin-bottom:12px;">
+            <div>
+              <label>Patente del Tracto (o ID de Viaje) *</label>
+              <input type="text" id="man-patente" class="input-patente" placeholder="EJ: TVHZ13" onkeydown="if(event.key==='Enter') buscarManualEnExcel()" />
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-outline" style="flex:1;" onclick="buscarManualEnExcel()">🔍 Buscar en Excel</button>
+              <button type="button" class="btn btn-outline" onclick="limpiarFormManual()">🧹 Limpiar</button>
+            </div>
+          </div>
+
+          <div id="man-excel-info" class="hidden" style="margin-bottom:12px; padding:10px 12px; border-radius:10px; background:#eff6ff; border:1px solid #93c5fd; font-size:13px; color:#1e40af;"></div>
+
+          <div class="grid-3" style="margin-bottom:12px;">
+            <div>
+              <label>Fecha *</label>
+              <input type="date" id="man-fecha" />
+            </div>
+            <div>
+              <label>Hora de Inicio *</label>
+              <input type="time" id="man-hora-inicio" step="1" onchange="actualizarPreviewDuracionManual()" oninput="actualizarPreviewDuracionManual()" />
+            </div>
+            <div>
+              <label>Hora de Término *</label>
+              <input type="time" id="man-hora-fin" step="1" onchange="actualizarPreviewDuracionManual()" oninput="actualizarPreviewDuracionManual()" />
+            </div>
+          </div>
+
+          <div class="grid-3" style="margin-bottom:12px;">
+            <div>
+              <label>Empresa de Transporte (EETT) *</label>
+              <select id="man-eett" onchange="onChangeManEett()">
+                <option value="">-- Seleccionar EETT --</option>
+              </select>
+            </div>
+            <div id="man-wrap-eett-manual" class="hidden">
+              <label>Digitar Nueva EETT *</label>
+              <input type="text" id="man-eett-manual" placeholder="Nombre empresa de transporte" />
+            </div>
+            <div>
+              <label>Tipo de Operación *</label>
+              <select id="man-operacion">
+                <option value="CARGA">📦 CARGA</option>
+                <option value="DESCARGA">📥 DESCARGA</option>
+                <option value="D+C">🔄 D+C (Descarga + Carga)</option>
+              </select>
+            </div>
+            <div>
+              <label>Pallets (Opcional)</label>
+              <input type="number" id="man-pallets" min="0" value="0" />
+            </div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label>Observación (Opcional)</label>
+            <input type="text" id="man-obs" placeholder="Motivo del ingreso manual o comentarios..." />
+          </div>
+
+          <button type="button" class="btn btn-start" id="btn-guardar-manual" onclick="guardarTiempoManualApp()">
+            💾 GUARDAR REGISTRO MANUAL
+          </button>
         </div>
       </section>
 
@@ -387,7 +463,7 @@
     </main>
   </div>
 
-  <div id="badge-app-version" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.75); color:#fff; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; pointer-events:none;">v4.6</div>
+  <div id="badge-app-version" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.75); color:#fff; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; pointer-events:none;">v4.7</div>
 
   <!-- MODAL ACTUALIZACIÓN -->
   <div id="modal-actualizacion" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:300; display:flex; align-items:center; justify-content:center; padding:16px;">
@@ -468,7 +544,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '4.6';
+    const CLIENT_APP_VERSION = '4.7';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
     const STORAGE_OFFLINE_QUEUE_KEY = 'pn8000_pwa_offline_queue';
     const STORAGE_OFFLINE_CACHE_KEY = 'pn8000_pwa_offline_cache';
@@ -733,12 +809,13 @@
     }
 
     function switchTab(tab) {
-      ['tiempos', 'offline', 'moderador'].forEach(t => {
+      ['tiempos', 'manual', 'offline', 'moderador'].forEach(t => {
         const sec = document.getElementById('tab-' + t);
         if (sec) sec.classList.toggle('hidden', t !== tab);
         const btn = document.querySelector(`[data-tab="${t}"]`);
         if (btn) btn.classList.toggle('active', t === tab);
       });
+      if (tab === 'manual') inicializarFormManual();
       if (tab === 'offline') renderOfflineTab();
       if (tab === 'moderador') cargarModerador();
     }
@@ -1518,6 +1595,205 @@
       actualizarEstadoConexionUI();
       toast('📡 Sin internet: la app guardará tus registros localmente.');
     });
+
+    // ==================== REGISTRO MANUAL (HORA INICIO / TÉRMINO) ====================
+    let manualMatchedTrip = null;
+
+    function inicializarFormManual() {
+      const f = document.getElementById('man-fecha');
+      if (f && !f.value) {
+        const d = new Date();
+        f.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      }
+      poblarSelectManEett();
+      actualizarPreviewDuracionManual();
+    }
+
+    function poblarSelectManEett(valorSeleccionado) {
+      const sel = document.getElementById('man-eett');
+      if (!sel) return;
+      const prev = valorSeleccionado !== undefined ? valorSeleccionado : sel.value;
+      sel.innerHTML = '<option value="">-- Seleccionar EETT --</option>';
+      const list = [...eettList];
+      if (prev && !list.includes(prev) && prev !== '__OTRA__') list.unshift(prev);
+      list.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e; opt.textContent = e;
+        sel.appendChild(opt);
+      });
+      const optOtra = document.createElement('option');
+      optOtra.value = '__OTRA__';
+      optOtra.textContent = '➕ Otra (digitar manualmente)';
+      sel.appendChild(optOtra);
+      if (prev) sel.value = prev;
+      onChangeManEett();
+    }
+
+    function onChangeManEett() {
+      const isOtra = document.getElementById('man-eett').value === '__OTRA__';
+      document.getElementById('man-wrap-eett-manual').classList.toggle('hidden', !isOtra);
+    }
+
+    function actualizarPreviewDuracionManual() {
+      const hi = document.getElementById('man-hora-inicio').value;
+      const hf = document.getElementById('man-hora-fin').value;
+      const pill = document.getElementById('man-duracion-preview');
+      if (!pill) return;
+      if (!hi || !hf) {
+        pill.className = 'pill pill-blue';
+        pill.textContent = 'Duración: -- min';
+        return;
+      }
+      const p1 = hi.split(':').map(Number);
+      const p2 = hf.split(':').map(Number);
+      const s1 = (p1[0] || 0) * 3600 + (p1[1] || 0) * 60 + (p1[2] || 0);
+      const s2 = (p2[0] || 0) * 3600 + (p2[1] || 0) * 60 + (p2[2] || 0);
+      if (s2 <= s1) {
+        pill.className = 'pill pill-red';
+        pill.textContent = '⚠️ Hora término debe ser mayor';
+        return;
+      }
+      const mins = ((s2 - s1) / 60).toFixed(1);
+      pill.className = 'pill pill-green';
+      pill.textContent = `Duración: ${mins} min`;
+    }
+
+    function buscarManualEnExcel() {
+      const pat = document.getElementById('man-patente').value.trim().toUpperCase();
+      if (pat.length < 4) { toast('Ingresa al menos 4 caracteres para buscar.'); return; }
+      const pNorm = pat.replace(/[^A-Z0-9]/g, '');
+      const matches = viajesLocales.filter(v => {
+        const idN = String(v.idViaje || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const v1 = String(v.vehiculo || '').replace(/[^A-Z0-9]/g, '');
+        const v2 = String(v.vehiculoSecundario || '').replace(/[^A-Z0-9]/g, '');
+        return idN === pNorm || v2 === pNorm || v1 === pNorm || v2.includes(pNorm) || idN.includes(pNorm);
+      });
+      const infoEl = document.getElementById('man-excel-info');
+      if (matches.length === 0) {
+        manualMatchedTrip = null;
+        infoEl.classList.add('hidden');
+        toast('No se encontró en Excel; puedes digitar los datos manualmente.');
+        return;
+      }
+      const v = matches[0];
+      manualMatchedTrip = v;
+      if (v.vehiculoSecundario || v.vehiculo) {
+        document.getElementById('man-patente').value = v.vehiculoSecundario || v.vehiculo;
+      }
+      poblarSelectManEett(v.eett);
+      document.getElementById('man-operacion').value = v.tipoOperacion || 'CARGA';
+      document.getElementById('man-pallets').value = v.palletsDespachados || v.palletsPlanificados || 0;
+      infoEl.innerHTML = `✅ <strong>Excel encontrado:</strong> Viaje <strong>${v.idViaje}</strong> · ${v.depositoOrigen} → ${v.depositoDestino} · ${v.eett} (${v.palletsDespachados || v.palletsPlanificados || 0} pal)`;
+      infoEl.classList.remove('hidden');
+    }
+
+    function limpiarFormManual() {
+      manualMatchedTrip = null;
+      document.getElementById('man-patente').value = '';
+      document.getElementById('man-hora-inicio').value = '';
+      document.getElementById('man-hora-fin').value = '';
+      document.getElementById('man-eett-manual').value = '';
+      document.getElementById('man-pallets').value = '0';
+      document.getElementById('man-obs').value = '';
+      document.getElementById('man-excel-info').classList.add('hidden');
+      poblarSelectManEett('');
+      actualizarPreviewDuracionManual();
+    }
+
+    async function guardarTiempoManualApp() {
+      const patente = document.getElementById('man-patente').value.trim().toUpperCase();
+      const fecha = document.getElementById('man-fecha').value;
+      const horaInicio = document.getElementById('man-hora-inicio').value;
+      const horaFin = document.getElementById('man-hora-fin').value;
+      let eettFinal = document.getElementById('man-eett').value;
+      if (eettFinal === '__OTRA__') eettFinal = document.getElementById('man-eett-manual').value.trim();
+      const tipoOperacion = document.getElementById('man-operacion').value;
+      const pallets = Number(document.getElementById('man-pallets').value) || 0;
+      const observacion = document.getElementById('man-obs').value.trim();
+
+      if (!patente) { toast('Ingresa la patente.'); return; }
+      if (!fecha || !horaInicio || !horaFin) { toast('Completa fecha, hora de inicio y hora de término.'); return; }
+      if (!eettFinal) { toast('Selecciona o digita la Empresa de Transporte.'); return; }
+
+      const fP = fecha.split('-').map(Number);
+      const h1 = horaInicio.split(':').map(Number);
+      const h2 = horaFin.split(':').map(Number);
+      const dtIni = new Date(fP[0], fP[1] - 1, fP[2], h1[0] || 0, h1[1] || 0, h1[2] || 0);
+      const dtFin = new Date(fP[0], fP[1] - 1, fP[2], h2[0] || 0, h2[1] || 0, h2[2] || 0);
+      if (dtFin.getTime() <= dtIni.getTime()) {
+        toast('La hora de término debe ser posterior a la hora de inicio.');
+        return;
+      }
+
+      const v = manualMatchedTrip || {};
+      const payload = {
+        usuarioCorreo: currentUser.correo,
+        patente: patente,
+        fecha: fecha,
+        horaInicio: horaInicio,
+        horaFin: horaFin,
+        eettFinal: eettFinal,
+        eettOriginal: v.eett || '',
+        origenDato: manualMatchedTrip ? 'EXCEL' : 'MANUAL',
+        idViaje: v.idViaje || '',
+        vehiculoPrincipal: v.vehiculo || patente,
+        vehiculoSecundario: v.vehiculoSecundario || '',
+        palletsPlanificados: v.palletsPlanificados || pallets,
+        palletsDespachados: pallets,
+        tipoVehiculo: v.tipoVehiculo || '',
+        categoria: v.categoria || '',
+        depositoOrigen: v.depositoOrigen || '',
+        depositoDestino: v.depositoDestino || appConfig.PLANTA_OBJETIVO,
+        codigoEETT: v.codigoEETT || '',
+        jornadaExcel: v.jornada || '',
+        estadoExcel: v.estado || '',
+        observacion: observacion,
+        tipoOperacion: tipoOperacion
+      };
+
+      const guardarManualEnColaOffline = () => {
+        const duracionMin = Math.max(0.1, Number(((dtFin.getTime() - dtIni.getTime()) / 60000).toFixed(2)));
+        const offlineId = 'OFF-' + Date.now() + '-' + Math.floor(100 + Math.random() * 900);
+        const cola = leerColaOffline();
+        cola.unshift({
+          ...payload,
+          offlineId: offlineId,
+          clientStartMs: dtIni.getTime(),
+          clientStopMs: dtFin.getTime(),
+          horaInicioTexto: horaInicio,
+          horaFinTexto: horaFin,
+          duracionMin: duracionMin,
+          observacion: observacion ? (observacion + ' [HORA MANUAL]') : '[HORA MANUAL]'
+        });
+        guardarColaOffline(cola);
+        limpiarFormManual();
+        toast(`📡 ${patente} guardado offline (${duracionMin} min). Súbelo en 📡 Offline.`);
+      };
+
+      if (estaModoOffline()) {
+        guardarManualEnColaOffline();
+        return;
+      }
+
+      const btn = document.getElementById('btn-guardar-manual');
+      btn.disabled = true;
+      btn.textContent = '⏳ Guardando...';
+      try {
+        const res = await apiCall('registrarTiempoManual', payload);
+        btn.disabled = false;
+        btn.textContent = '💾 GUARDAR REGISTRO MANUAL';
+        toast(`✅ ${patente} guardado (${res.duracionMin} min · Meta: ${res.cumpleMeta})`);
+        limpiarFormManual();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '💾 GUARDAR REGISTRO MANUAL';
+        if (esErrorDeRed(err)) {
+          guardarManualEnColaOffline();
+        } else {
+          toast('Error: ' + err.message);
+        }
+      }
+    }
 
     async function cargarModerador() {
       try {
