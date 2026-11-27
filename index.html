@@ -483,7 +483,18 @@
     </main>
   </div>
 
-  <div id="badge-app-version" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.75); color:#fff; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; pointer-events:none;">v4.9</div>
+  <button type="button" id="badge-app-version" onclick="abrirModalNovedades()" title="Ver notas de actualización" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.82); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.2);">🆕 v4.10 · Novedades</button>
+
+  <!-- MODAL NOVEDADES / ACTUALIZACIONES -->
+  <div id="modal-novedades" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:320; display:flex; align-items:center; justify-content:center; padding:16px;" onclick="if(event.target===this) cerrarModalNovedades()">
+    <div class="card" style="width:100%; max-width:520px; max-height:85vh; overflow-y:auto; margin:0; border:2px solid var(--primary);">
+      <div class="card-title">
+        <span>🚀 Novedades y Actualizaciones (v4.10)</span>
+        <button type="button" class="btn btn-outline btn-sm" onclick="cerrarModalNovedades()">✕</button>
+      </div>
+      <div id="novedades-lista" style="display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+  </div>
 
   <!-- MODAL ACTUALIZACIÓN -->
   <div id="modal-actualizacion" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:300; display:flex; align-items:center; justify-content:center; padding:16px;">
@@ -564,7 +575,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '4.9';
+    const CLIENT_APP_VERSION = '4.10';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
     const STORAGE_OFFLINE_QUEUE_KEY = 'pn8000_pwa_offline_queue';
     const STORAGE_OFFLINE_CACHE_KEY = 'pn8000_pwa_offline_cache';
@@ -818,6 +829,43 @@
           window.location.reload(true);
         }
       }, 1000);
+    }
+
+    function abrirModalNovedades() {
+      const notas = [
+        { ver: 'v4.10', titulo: '🆕 Pestaña de Novedades y Registro Manual Multi-Camión', items: [
+          'Toca la etiqueta inferior derecha para ver el historial de cambios recientes.',
+          'Módulo 📝 Registro Manual con modos CARGA, DESCARGA y D+C y botón ▶ COMENZAR Y AÑADIR CAMIÓN.',
+          'Monitoreo simultáneo de varios camiones con hora de inicio automática y hora de término manual.'
+        ]},
+        { ver: 'v4.6', titulo: '⚡ Monitoreo en Vivo y Gestor Visible', items: [
+          'Actualización automática cada 4 segundos de los camiones activos.',
+          'Cada tarjeta muestra 👤 con el gestor que monitorea el camión.'
+        ]},
+        { ver: 'v4.3 - v4.5', titulo: '📡 Modo Sin Internet y Rotación Libre', items: [
+          'Pestaña 📡 Offline para trabajar sin señal y subir los datos al reconectar.',
+          'Rotación horizontal/vertical habilitada y botón visible para instalar la app.'
+        ]},
+        { ver: 'v4.1', titulo: '🔄 Modo D+C (Unión de Flujo)', items: [
+          'Detección automática cuando una misma patente tiene Descarga + Carga en PN8000.'
+        ]}
+      ];
+      document.getElementById('novedades-lista').innerHTML = notas.map(n => `
+        <div style="border:1px solid var(--border); border-radius:10px; padding:10px 12px; background:#f8fafc;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <strong style="color:var(--primary); font-size:14px;">${n.titulo}</strong>
+            <span class="pill pill-blue">${n.ver}</span>
+          </div>
+          <ul style="margin:0; padding-left:18px; font-size:13px; color:#334155; display:flex; flex-direction:column; gap:3px;">
+            ${n.items.map(i => `<li>${i}</li>`).join('')}
+          </ul>
+        </div>
+      `).join('');
+      document.getElementById('modal-novedades').classList.remove('hidden');
+    }
+
+    function cerrarModalNovedades() {
+      document.getElementById('modal-novedades').classList.add('hidden');
     }
 
     function postergarActualizacion() {
