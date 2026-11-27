@@ -483,7 +483,23 @@
     </main>
   </div>
 
-  <button type="button" id="badge-app-version" onclick="abrirModalNovedades()" title="Ver notas de actualización" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.82); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.2);">🆕 v4.10 · Novedades</button>
+  <!-- MINI WIDGET FLOTANTE -->
+  <div id="mini-timer-widget" class="hidden" style="position:fixed; bottom:38px; right:10px; z-index:250; background:#0f172a; color:#fff; border:2px solid var(--primary); border-radius:14px; padding:10px 12px; box-shadow:0 10px 25px rgba(0,0,0,0.35); min-width:230px; max-width:92vw;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;">
+      <strong id="mw-patente" style="font-size:15px;">--</strong>
+      <div style="display:flex; gap:4px; align-items:center;">
+        <button type="button" onclick="activarPiPWidget()" title="Ventana flotante sobre otras páginas (PiP)" style="background:#1e293b; color:#fff; border:1px solid #475569; border-radius:6px; padding:3px 7px; font-size:11px; cursor:pointer; font-weight:700;">📺 Flotar</button>
+        <button type="button" onclick="cerrarMiniWidget()" title="Cerrar widget" style="background:none; color:#94a3b8; border:none; font-size:15px; cursor:pointer; padding:2px 4px;">✕</button>
+      </div>
+    </div>
+    <div id="mw-eett" style="font-size:11px; color:#cbd5e1; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <span id="mw-timer" style="font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; color:#4ade80;">00:00</span>
+      <button type="button" class="btn btn-stop btn-sm" style="min-height:36px; padding:6px 12px; font-size:13px;" onclick="pararDesdeMiniWidget()">⏹ PARAR</button>
+    </div>
+  </div>
+
+  <button type="button" id="badge-app-version" onclick="abrirModalNovedades()" title="Ver notas de actualización" style="position:fixed; bottom:8px; right:10px; z-index:90; background:rgba(15,23,42,0.82); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.2);">🆕 v4.11 · Novedades</button>
 
   <!-- MODAL NOVEDADES / ACTUALIZACIONES -->
   <div id="modal-novedades" class="hidden" style="position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:320; display:flex; align-items:center; justify-content:center; padding:16px;" onclick="if(event.target===this) cerrarModalNovedades()">
@@ -575,7 +591,7 @@
 
   <script>
     const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwcS_MhVJN53YzKW7vGoLOCHt6WRuGv_zA8hKX3epi6X456P5pP09OrnS8A1-kogkH8nA/exec';
-    const CLIENT_APP_VERSION = '4.10';
+    const CLIENT_APP_VERSION = '4.11';
     const STORAGE_SESSION_KEY = 'pn8000_pwa_session';
     const STORAGE_OFFLINE_QUEUE_KEY = 'pn8000_pwa_offline_queue';
     const STORAGE_OFFLINE_CACHE_KEY = 'pn8000_pwa_offline_cache';
@@ -1124,7 +1140,10 @@
                    onkeydown="if(event.key==='Enter') agregarComentarioApp('${a.idRegistro}')" />
             <button class="btn btn-outline btn-sm" id="btn-obs-${a.idRegistro}" onclick="agregarComentarioApp('${a.idRegistro}')" title="Agregar comentario">💬</button>
           </div>
-          <button class="btn btn-stop" onclick="finalizarDescargaApp('${a.idRegistro}', '${a.patente}')">⏹ FINALIZAR DESCARGA</button>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-stop" style="flex:1;" onclick="finalizarDescargaApp('${a.idRegistro}', '${a.patente}')">⏹ FINALIZAR DESCARGA</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="abrirMiniWidget('${a.idRegistro}')" title="Fijar como mini widget flotante">📌 Widget</button>
+          </div>
         </div>
       `).join('');
 
@@ -1143,6 +1162,128 @@
         const card = el.closest('.truck-card');
         if (card) card.classList.toggle('over-meta', diff > metaMs);
       });
+      actualizarMiniWidgetTick(ahora, metaMs);
+    }
+
+    // ==================== MINI WIDGET FLOTANTE & PICTURE-IN-PICTURE ====================
+    let miniWidgetId = null;
+    let pipWindowRef = null;
+    let pipCanvasInterval = null;
+
+    function abrirMiniWidget(idRegistro) {
+      miniWidgetId = idRegistro;
+      const w = document.getElementById('mini-timer-widget');
+      if (w) w.classList.remove('hidden');
+      actualizarMiniWidgetTick(Date.now(), (Number(appConfig.META_MINUTOS) || 45) * 60000);
+    }
+
+    function cerrarMiniWidget() {
+      miniWidgetId = null;
+      const w = document.getElementById('mini-timer-widget');
+      if (w) w.classList.add('hidden');
+      if (pipWindowRef && !pipWindowRef.closed) { try { pipWindowRef.close(); } catch (e) {} }
+      if (pipCanvasInterval) { clearInterval(pipCanvasInterval); pipCanvasInterval = null; }
+      if (document.pictureInPictureElement) { try { document.exitPictureInPicture(); } catch (e) {} }
+    }
+
+    function actualizarMiniWidgetTick(ahora, metaMs) {
+      if (!miniWidgetId) return;
+      const a = activosList.find(x => x.idRegistro === miniWidgetId);
+      if (!a) { cerrarMiniWidget(); return; }
+      const cardEl = document.querySelector(`#card-${miniWidgetId} .timer-display`);
+      const timerTxt = cardEl ? cardEl.textContent : '00:00';
+      document.getElementById('mw-patente').textContent = '🚛 ' + a.patente;
+      document.getElementById('mw-eett').textContent = a.eett || '';
+      const tEl = document.getElementById('mw-timer');
+      tEl.textContent = timerTxt;
+      const baseElapsed = cardEl ? (Number(cardEl.dataset.elapsed) || 0) : (Number(a.elapsedMs) || 0);
+      const syncAt = cardEl ? (Number(cardEl.dataset.sync) || ahora) : ahora;
+      const diff = Math.max(0, baseElapsed + (ahora - syncAt));
+      tEl.style.color = diff > metaMs ? '#f87171' : '#4ade80';
+      if (pipWindowRef && !pipWindowRef.closed) {
+        const pt = pipWindowRef.document.getElementById('pip-timer');
+        if (pt) { pt.textContent = timerTxt; pt.style.color = diff > metaMs ? '#dc2626' : '#007a33'; }
+      }
+    }
+
+    function pararDesdeMiniWidget() {
+      if (!miniWidgetId) return;
+      const a = activosList.find(x => x.idRegistro === miniWidgetId);
+      if (!a) { cerrarMiniWidget(); return; }
+      finalizarDescargaApp(a.idRegistro, a.patente);
+      cerrarMiniWidget();
+    }
+
+    async function activarPiPWidget() {
+      const a = activosList.find(x => x.idRegistro === miniWidgetId);
+      if (!a) return;
+      if ('documentPictureInPicture' in window) {
+        try {
+          if (pipWindowRef && !pipWindowRef.closed) pipWindowRef.close();
+          const pipWin = await window.documentPictureInPicture.requestWindow({ width: 270, height: 150 });
+          pipWindowRef = pipWin;
+          pipWin.document.body.style.cssText = 'margin:0; padding:12px; font-family:sans-serif; background:#0f172a; color:#fff; display:flex; flex-direction:column; justify-content:space-between; height:100vh; box-sizing:border-box;';
+          pipWin.document.body.innerHTML = `
+            <div>
+              <div style="font-size:16px; font-weight:800;">🚛 ${a.patente}</div>
+              <div style="font-size:11px; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.eett || ''}</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <span id="pip-timer" style="font-size:26px; font-weight:800; color:#4ade80;">00:00</span>
+              <button id="pip-stop" style="background:#dc2626; color:#fff; border:none; border-radius:8px; padding:8px 14px; font-weight:800; font-size:13px; cursor:pointer;">⏹ PARAR</button>
+            </div>`;
+          pipWin.document.getElementById('pip-stop').onclick = () => {
+            pararDesdeMiniWidget();
+            try { pipWin.close(); } catch (e) {}
+          };
+          return;
+        } catch (e) {}
+      }
+      try {
+        let canvas = document.getElementById('pip-canvas-helper');
+        let video = document.getElementById('pip-video-helper');
+        if (!canvas) {
+          canvas = document.createElement('canvas');
+          canvas.id = 'pip-canvas-helper';
+          canvas.width = 320; canvas.height = 140;
+          canvas.style.display = 'none';
+          document.body.appendChild(canvas);
+        }
+        if (!video) {
+          video = document.createElement('video');
+          video.id = 'pip-video-helper';
+          video.muted = true;
+          video.playsInline = true;
+          video.style.cssText = 'position:fixed; width:1px; height:1px; opacity:0; pointer-events:none;';
+          document.body.appendChild(video);
+        }
+        const ctx = canvas.getContext('2d');
+        const dibujar = () => {
+          const act = activosList.find(x => x.idRegistro === miniWidgetId);
+          const tEl = document.getElementById('mw-timer');
+          const txt = tEl ? tEl.textContent : '00:00';
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(0, 0, 320, 140);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 24px sans-serif';
+          ctx.fillText(act ? ('🚛 ' + act.patente) : 'Finalizado', 16, 40);
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '14px sans-serif';
+          ctx.fillText(act ? String(act.eett || '').slice(0, 32) : '', 16, 66);
+          ctx.fillStyle = '#4ade80';
+          ctx.font = 'bold 42px monospace';
+          ctx.fillText(txt, 16, 118);
+        };
+        dibujar();
+        if (pipCanvasInterval) clearInterval(pipCanvasInterval);
+        pipCanvasInterval = setInterval(dibujar, 1000);
+        video.srcObject = canvas.captureStream(2);
+        await video.play();
+        await video.requestPictureInPicture();
+        toast('📺 Ventana flotante activa. Toca la ventana para volver y parar.');
+      } catch (err) {
+        toast('Tu navegador no permite PiP externo; usa el mini widget dentro de la app o Pantalla Dividida de la tablet.');
+      }
     }
 
     let modoOperacionActual = 'CARGA';
